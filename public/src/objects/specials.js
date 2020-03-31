@@ -87,6 +87,8 @@ class Crate extends Phaser.Physics.Matter.Sprite{
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.SOLID)
         .setPosition(x, y) 
+
+        this.isGrabbed  = false;
     }
     setup(x,y){
         this.setActive(true);
@@ -94,7 +96,40 @@ class Crate extends Phaser.Physics.Matter.Sprite{
     }
     update(time, delta)
     {       
+        if(this.isGrabbed){
+            this.holdConstraint.pointA =  { x: bright.x, y: bright.y };
+            //this.holdConstraint.pointB = {x:this.scene.input.activePointer.worldX-this.x,y:this.scene.input.activePointer.worldY - this.y};
+            this.holdConstraint.angleB =  this.rotation;
+        }
+        //Highlight if it can be grabbed by bright
+        if(Phaser.Math.Distance.Between(this.x,this.y,bright.x,bright.y) < 32 && soullight.ownerid == 1){
+            this.setTint(0x00FF00);
+        }else{
+            if(this.tintTopLeft > 0){
+                this.clearTint();
+            }
+        }
+    }
+    grabbed(){
+        if(!this.isGrabbed){
+            this.holdConstraint = Phaser.Physics.Matter.Matter.Constraint.create({
+                pointA: { x: bright.x, y: bright.y },
+                bodyB: this.body,
+                //pointB: {x:this.scene.input.activePointer.worldX-this.x,y:this.scene.input.activePointer.worldY - this.y},
+                angleB: this.rotation,
+                length:32,
+                stiffness: 0.8
+            });
+            this.scene.matter.world.add(this.holdConstraint);   
 
+            this.isGrabbed  = true;
+        }
+    }
+    released(){
+        if(this.isGrabbed){
+            this.scene.matter.world.remove(this.holdConstraint);
+            this.isGrabbed  = false;
+        }
     }
 };
 
@@ -346,8 +381,9 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
             let fromBody = obj.body;
             let speed = Math.sqrt(Math.pow(fromBody.velocity.x,2)+Math.pow(fromBody.velocity.y,2));
             let force = speed*fromBody.density*100;
+            console.log("Crush Force", force,this.breakFrames.length);
             if(force >= 2){                
-                this.breakFrame++;
+                this.breakFrame = this.breakFrame + Math.round(force);
                 if(this.breakFrame < this.breakFrames.length){
                     this.detailSprite.setFrame(this.breakFrames[this.breakFrame]);
                 }else{

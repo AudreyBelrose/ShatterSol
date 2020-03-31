@@ -237,7 +237,6 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('pressure_plate', 'assets/objects/pressure_plate.png', {frameWidth: 32, frameHeight: 6});
 		this.load.spritesheet('tmxbutton', 'assets/objects/tmxbutton.png', {frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('platform_160x16', 'assets/objects/platform_160x16.png', {frameWidth: 160, frameHeight: 16});
-		this.load.spritesheet('gameitems', 'assets/objects/gameitems.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('light_crystal', 'assets/objects/light_crystal.png', {frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('fireflies', 'assets/objects/fireflies.png', {frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('bat', 'assets/characters/bat_32.png', {frameWidth: 32, frameHeight: 32});
@@ -250,6 +249,7 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('bright_pulse', 'assets/characters/pulse.png', {frameWidth: 48, frameHeight: 48});
 		this.load.spritesheet('telebeam', 'assets/objects/telebeam.png', {frameWidth: 64, frameHeight: 64});
 		this.load.spritesheet('window_shatter', 'assets/objects/window_shatter.png', {frameWidth: 64, frameHeight: 96});
+        this.load.spritesheet('solana_shield', 'assets/objects/solana_shield.png', {frameWidth: 32, frameHeight: 32});
 		//SoulCrystals
 		this.load.spritesheet('soulcrystal_blue', 'assets/objects/crystal-qubodup-ccby3-32-blue.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('soulcrystal_grey', 'assets/objects/crystal-qubodup-ccby3-32-grey.png', {frameWidth: 32, frameHeight: 32});		

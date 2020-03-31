@@ -2,8 +2,12 @@
     var config = {
         type: Phaser.WEBGL,
         width: 1280,
-        height: 896, 
+        height: 720, 
         pixelArt: true,
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH,
+        },
         input: {
             gamepad: true
         },
@@ -110,12 +114,6 @@
     var keyPad;
     //Crystals
     var soullightClaimed = false;
-    var solanaEquipment = [
-        {id:0,name:"Wand",lvl:0,equiped:false},
-        {id:1,name:"Crown",lvl:0,equiped:false},
-        {id:2,name:"Wings",lvl:0,equiped:false},
-        {id:3,name:"Belt",lvl:0,equiped:false}
-    ];
     //Player Management
     var playerMode = 0;//0-Single,1-LocalCoop,2-OnlineCoop
     var playerModes = ['Single','Local-COOP','Online'];
@@ -148,12 +146,6 @@
         ENEMIES: 200,
         PLAYERS: 300,
         FRONT: 999
-    }
-    const GAMEITEM = {
-        WAND: 0,
-        CROWN: 1,
-        WING: 2,
-        BELT: 3
     }
     var playerConfig = 
     [{
@@ -428,3 +420,23 @@
     
     //Game
     var game = new Phaser.Game(config);
+    
+    //Global resize window function
+    // var gameResize = function (e) {
+    //     var aspectRatio = 1.5; 
+    //     if ((window.innerWidth / window.innerHeight) > aspectRatio) { 
+    //         game.scale.width = window.innerHeight * aspectRatio; game.scale.height = window.innerHeight; 
+    //     } else if ((window.innerWidth / window.innerHeight) < aspectRatio) { 
+    //         game.scale.width = window.innerWidth; game.scale.height = window.innerWidth / aspectRatio; 
+    //     } else { 
+    //         game.scale.width = window.innerWidth; game.scale.height = window.innerHeight; 
+    //     }
+    //     game.scale.refresh();
+    // } 
+    // window.onresize = gameResize; 
+    // function initGameSize(){
+    //     game.scale.pageAlignHorizontally = true; 
+    //     game.scale.pageAlignVertically = true; 
+    //     gameResize(); 
+    // }
+    // initGameSize();
