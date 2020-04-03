@@ -25,6 +25,10 @@ var GameScene = new Phaser.Class({
         //Refresh/Setup HUD
         hud = this.scene.get('UIScene');;
         hud.handleEvents();
+        //Register important events
+        //Pause / UnPause
+        this.events.on('pause', playPause);
+        this.events.on('resume', playResume);
         
         //Play Theme Music
         this.soundTheme = game.sound.add('forestTheme1');
@@ -64,10 +68,10 @@ var GameScene = new Phaser.Class({
         //Load the collision tiles
         var CollisionTiles = map.addTilesetImage('collision','collisions32');//called it collision in tiled
         // create the Graphic layers      
-        let bglayer3 = map.createStaticLayer('bg3', tilesetImages, 0, 0);
-        let bglayer2 = map.createStaticLayer('bg2', tilesetImages, 0, 0);
-        let bglayer = map.createStaticLayer('bg', tilesetImages, 0, 0);
-        let fglayer = map.createStaticLayer('fg', tilesetImages, 0, 0); 
+        this.bglayer3 = map.createStaticLayer('bg3', tilesetImages, 0, 0);
+        this.bglayer2 = map.createStaticLayer('bg2', tilesetImages, 0, 0);
+        this.bglayer = map.createStaticLayer('bg', tilesetImages, 0, 0);
+        this.fglayer = map.createStaticLayer('fg', tilesetImages, 0, 0); 
         //Create the special layers
         let fghiddenlayer= map.createDynamicLayer('fg_hidden', tilesetImages, 0, 0); 
         let fgbreakablelayer= map.createDynamicLayer('fg_breakable', tilesetImages, 0, 0); 
@@ -205,6 +209,7 @@ var GameScene = new Phaser.Class({
             //console.log("Poly Object",shapeObject);
             //Need to add light blocking polygon check here.
             hulls.push(shapeObject);
+            losBlockers.push(shapeObject.body);
         });
 
         //Perimeter Block for Blocking Light
@@ -640,7 +645,7 @@ var GameScene = new Phaser.Class({
          //timeEventName.remove();spawnEnemies(spawnlayer.objects)
          
          //Pass Energy Regen
-         this.energyTimer = this.time.addEvent({ delay: 500, callback: this.generateEnergy, callbackScope: this, loop: true });
+         this.energyTimer = this.time.addEvent({ delay: 250, callback: this.generateEnergy, callbackScope: this, loop: true });
 
       
         
@@ -1143,7 +1148,7 @@ var GameScene = new Phaser.Class({
                 if ((bodyA.label === 'FIREFLY' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'FIREFLY')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'FIREFLY');
                     if (gObjs[0].active){
-                        hud.alterEnergy(10);
+                        hud.alterEnergySolana(10);
                         fireflies.killAndHide(gObjs[0]);
                         //gObjs[0].collect();
                     }  
@@ -1190,9 +1195,10 @@ var GameScene = new Phaser.Class({
         }, this);
 
         //Mouse
-        pointer = this.input.activePointer;
+        // pointer = this.input.activePointer;
 
-        keyPad = new KeyboardMouseControl(this,pointer)
+        // keyPad = new KeyboardMouseControl(this,pointer)
+        this.doKPClear = false;
 
         if(playerMode == 0){
             solana.setController(playerConfig[0].ctrl);
@@ -1240,10 +1246,16 @@ var GameScene = new Phaser.Class({
     },
     update: function (time, delta)
     {
+        //Handle KP "Sticking" bug
+        // if(this.doKPClear){
+        //     if(keyPad != undefined){
+        //         keyPad.clearKeyStates();
+        //     }
+        //     this.doKPClear = false;
+        // }
+        //Update Inputs
 
-        //Controller Update
-        updateGamePads();
-        keyPad.updateKeyState();
+
         //center camera on the spot between the players. Zoom out to a max.
         let disPlayers = Phaser.Math.Distance.Between(solana.x,solana.y,bright.x,bright.y);
 
@@ -1319,6 +1331,7 @@ var GameScene = new Phaser.Class({
         //Cut out line of sight blockers
         this.cutCanvasRaycastPolygon(soullight.x,soullight.y,soullight.protection_radius.value*5,shadow_context);
      
+        //Check to see if Solana is in the light
         var solana_in_light = false;
 
         shadow_context = this.cutCanvasCircle(soullight.x,soullight.y,soullight.protection_radius.value,shadow_context);
@@ -1327,7 +1340,13 @@ var GameScene = new Phaser.Class({
         if(tutorialRunning){
             //shadow_context = this.cutCanvasCircle(polaris.x,polaris.y,128,shadow_context);
         }
-        if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) <= soullight.protection_radius.value){solana_in_light = true;}
+        if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) <= soullight.protection_radius.value){
+            
+            //Can the light reach her without being blocked?
+            let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:soullight.x,y:soullight.y});
+            if(losRc.length == 0){solana_in_light = true;};
+
+        }
         
 
         //Restore Canvas
@@ -1364,8 +1383,8 @@ var GameScene = new Phaser.Class({
         solana.inLight = solana_in_light;
         let rate_of_energy_drain_outside_light = 1;
         if(!solana_in_light){
-            hud.alterEnergy(-rate_of_energy_drain_outside_light);
-            if(hud.energy.n <= 0){solana.receiveDamage(1);};
+            hud.alterEnergySolana(-rate_of_energy_drain_outside_light);
+            if(hud.solanaStatBar.getValue() <= 0){solana.receiveDamage(1);};
         };
 
         //Update Light Source
@@ -1533,7 +1552,8 @@ var GameScene = new Phaser.Class({
 		this.scene.start('mainmenu');
     },
     generateEnergy(){
-        hud.alterEnergy(1);
+        hud.alterEnergySolana(2);
+        hud.alterEnergyBright(2);
     },
     spawnEnemies(){
         console.log("timer spawner!");
@@ -1595,10 +1615,22 @@ var GameScene = new Phaser.Class({
         }
         
         return [{x:0,y:0},{x:0,y:0}];
+    },
+    clearKeypad(){
+        this.doKPClear = true;
     }
     
 });
 //External Functions
+function playPause(){
+    //console.log('Pause',keyPad, solana.getControllerAction('right'),keyPad.checkKeyState('D'));
+
+}
+function playResume(){
+    //console.log('Resume',keyPad, solana.getControllerAction('right'),keyPad.checkKeyState('D'));
+    //Setup keypad clear on next update
+    //playScene.clearKeypad();    
+}
 function getObjectTilePosition(x,y,ts){
     return {x: Math.floor(x/ts),y: Math.floor(y/ts)};
 }
@@ -1873,7 +1905,7 @@ function createAnimations(scene){
     });
     scene.anims.create({
         key: 'bright-idle',
-        frames: scene.anims.generateFrameNumbers('bright', { start: 0, end: 1 }),
+        frames: scene.anims.generateFrameNumbers('bright', { start: 1, end: 1 }),
         frameRate: 2,
         repeat: -1
     });
@@ -1885,13 +1917,13 @@ function createAnimations(scene){
     });
     scene.anims.create({
         key: 'bright-sway',
-        frames: scene.anims.generateFrameNumbers('bright', { frames:[0,2,3,4,5,6,7,8,9,10,11,0,2,3,18,17,16,15,14,13,12,11] }),
+        frames: scene.anims.generateFrameNumbers('bright', { frames:[1] }),
         frameRate: 24,
         repeat: -1
     });
     scene.anims.create({
         key: 'bright-move',
-        frames: scene.anims.generateFrameNumbers('bright', { frames:[3,4,5,6,7,8,9,11,12,13,14,15,16,17,18] }),
+        frames: scene.anims.generateFrameNumbers('bright', { frames:[1] }),
         frameRate: 12,
         repeat: -1
     });        

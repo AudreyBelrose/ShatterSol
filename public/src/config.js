@@ -20,9 +20,9 @@
             },
             matter: {
                 gravity: { y: 0.65 },
-                positionIterations: 8, //6
-                velocityIterations: 6, //4
-                constraintIterations: 4 //2
+                positionIterations: 10, //8
+                velocityIterations: 8, //6
+                constraintIterations: 6 //2
             }
         },
         // Install the scene plugin
@@ -35,7 +35,7 @@
             }
             ]
         }, 
-        scene: [ Preloader, SplashScene, MainMenu, IntroScene, Storyboard, LobbyScene, GameScene, HudScene, GameoverScene ]
+        scene: [ Preloader, SplashScene, MainMenu, Storyboard, LobbyScene, GameScene, HudScene, GameoverScene ]
     };
     
     //Globals
@@ -85,7 +85,8 @@
     var new_enemy;
     var spawner;
     var spawnlayer;
-
+    //Raycast
+    var losBlockers = [];
     //NPC Control
     var guideDialogueIndex = 0;
     var tutorialRunning = false;

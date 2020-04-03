@@ -1,5 +1,3 @@
-//Bright does not have health, but does have corruption. Being Dark for too long, or taking hits from enemies corrupts him. If he reaches full corruption, you have to battle him.
-
 class Bright extends Phaser.Physics.Matter.Sprite{
     constructor(scene,x,y) {
         super(scene.matter.world, x, y, 'bright', 0)
@@ -30,7 +28,17 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         //.setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setPosition(x, y)
         .setIgnoreGravity(true);
-          
+        
+        this.bg = this.scene.add.image(x,y,'bright',0);
+        this.scene.tweens.add({
+            targets: this.bg,
+            rotation: (Math.PI*2),              
+            ease: 'Linear',
+            repeat: -1,       
+            duration: 4000,
+            yoyo: true,  
+        });
+
         //Sensors
         this.sensor = new BrightSensors(scene,x,y);
 
@@ -49,7 +57,6 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.touching = {up:0,down:0,left:0,right:0};
         this.airTime = 0;//For Camera Shake
         this.light_radius = 75;
-        this.corruption = {c:0, m: 60};
         //Dialogue    
         this.dialogue = new Dialogue(this.scene,[{speaker:this,ttl:0,text:""}],54,-40);  
         //FollowMode Solana
@@ -61,7 +68,6 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         ];
         //console.log(this.effect[0].emitters.list[0]);
         this.effect[0].setVisible(false);
-        console.log("Bright Effect", this.effect[0]);
         this.effect[0].emitters.list[0].setPosition(this.x,this.y);
         //this.effect[0].emitters.list[0].startFollow(this);
 
@@ -76,6 +82,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
         this.darkdashTimer = this.scene.time.addEvent({ delay: 200, callback: this.resetDarkDask, callbackScope: this, loop: false });
         this.darkdashReady = true;
+        this.slamReady = true;
 
         //Controller
         this.controller;
@@ -85,6 +92,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
     update()
     {
+            this.bg.setPosition(this.x,this.y);
             if(this.alive){
                 this.effect[0].emitters.list[0].setPosition(this.x,this.y);
                 this.sensor.setPosition(this.x,this.y);
@@ -97,6 +105,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     this.airTime++;
                 }else{
                     this.airTime=0;
+                    this.slamReady = true;
                 };
                 if(this.abPulse.doCharge){
                     this.pulseUpdate();
@@ -128,6 +137,11 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             //Control Based on Light or Dark Modes
             let darkMode = 1;
             let brightMode = 0;
+            //Drain Energy since not bright
+            if(this.light_status == darkMode){hud.alterEnergyBright(-0.5);};
+            //This creates a wobble of contention for add and remove values on different update loops.
+            //I should calc all the values and then apply the final result one time.
+
             if(curr_player==players.BRIGHT || playerMode > 0){
                 //Only control if currently the active control object
                 let control_left = this.getControllerAction('left');
@@ -150,8 +164,6 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     } 
                 }
                 if(this.light_status == brightMode){
-                    this.corruption.c++;
-                    if(this.corruption.c >= this.corruption.m){this.corruption.c = 0;this.applyCorruption(1);}
                     //BRIGHT CONTROLS 
                     if(control_beam && this.beamReady ){
                         this.beamReady = false;
@@ -214,8 +226,6 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
                 }else{
                     //DARK CONTROLS
-                    this.corruption.c++;
-                    if(this.corruption.c >= this.corruption.m){this.corruption.c = 0;this.applyCorruption(-1);}
                     if (control_left) {          
                         this.sprite.setAngularVelocity(-this.roll_speed);   
                         //this.applyForce({x:-this.roll_speed/50,y:0});          
@@ -251,7 +261,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                         }
 
                     }
-
+                    //Dark Stop
                     if (control_down && this.airTime == 0) {
                         let angVel = this.body.angularVelocity;
                         if(angVel > 0){this.setAngularVelocity(angVel-.05)};
@@ -263,10 +273,26 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                             emitter_dirt_spray.active = true;
                             emitter_dirt_spray.explode(5,this.x,this.y);
                         }
+                    //Dark Slam
+                    }else if(control_down && this.airTime > 30 && control_dash && this.slamReady){
+                        this.slamReady = false;
+                        this.sprite.applyForce({x:0,y:0.020});
+
+                        //For crushing stuff. If his velocity his above X, and his sensor bars touch a breakable tile, then 
+                        // use that force calculation for breaking them BEFORE his matter body collides. Should allow
+                        // him to break thru multiple objects cleanly.
                     }
-                                    //Dark Jump
+                    //Dark Jump
                     if(control_jump && this.airTime <=  10){
                         this.sprite.setVelocityY(-this.jump_speed);
+                    }
+
+                    //Singularity
+                    if(control_pulsePress){
+                        let solAngle = Phaser.Math.Angle.Between(this.x,this.y,solana.x,solana.y);
+                        let solForce = 0.02;
+                        let solPullVec = {x:-Math.cos(solAngle)*solForce,y:-Math.sin(solAngle)*solForce};
+                        solana.applyForce(solPullVec);
                     }
                 }
 
@@ -377,9 +403,6 @@ class Bright extends Phaser.Physics.Matter.Sprite{
     }
     resetDarkDask(){
         this.darkdashReady = true;
-    }
-    applyCorruption(n){
-        hud.alertCorruption(n);
     }
     toDark(){
         this.light_status = 1;

@@ -213,6 +213,7 @@ class GamepadControl {
 
 class KeyboardMouseControl {
     constructor(scene,pointer){
+        this.scene = scene;
         //Map Point and Controls
         this.buttons = {
             W: {b:scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),s:0},
@@ -239,6 +240,16 @@ class KeyboardMouseControl {
         //Create lists
         this.keys = Object.keys(this.buttons);
         this.mousekeys = Object.keys(this.msbuttons);
+    }
+    clearKeyStates(){
+        this.keys.forEach(function(name) {  
+            this.buttons[name].s = 0;
+            this.buttons[name].b.isDown = false;
+        },this);
+        this.mousekeys.forEach(function(name) {  
+            this.msbuttons[name].s = 0;
+        },this);
+        this.pointer.isDown = false;
     }
     updateKeyState(){
         //Get the statuses
