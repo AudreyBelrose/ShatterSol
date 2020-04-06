@@ -9,16 +9,13 @@ class Solana extends Phaser.Physics.Matter.Sprite{
 
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         
-        const { width: w, height: h } = this.sprite;
-        //const mainBody = Bodies.rectangle(0, 0, w * 0.6, h, { chamfer: { radius: 10 } });
-        
-
+        const { width: w, height: h } = this.sprite;      
         const mainBody = Bodies.rectangle(0, 0, w * 0.2, h*.65, { chamfer: { radius: 5 } });
         this.sensors = {
-          top: Bodies.rectangle(0, -h*0.35, w * 0.15, 2, { isSensor: true }),
-          bottom: Bodies.rectangle(0, h*0.35, w * 0.15, 2, { isSensor: true }),
-          left: Bodies.rectangle(-w * 0.11, 0, 2, h * 0.45, { isSensor: true }),
-          right: Bodies.rectangle(w * 0.11, 0, 2, h * 0.45, { isSensor: true })
+          top: Bodies.rectangle(0, -h*0.35, w * 0.15, 2, { isSensor: true, friction: 0.0 }),
+          bottom: Bodies.rectangle(0, h*0.35, w * 0.15, 2, { isSensor: true, friction: 0.0 }),
+          left: Bodies.rectangle(-w * 0.11, 0, 2, h * 0.45, { isSensor: true, friction: 0.0 }),
+          right: Bodies.rectangle(w * 0.11, 0, 2, h * 0.45, { isSensor: true, friction: 0.0 })
         };
         this.sensors.top.label = "SOLANA_TOP";
         this.sensors.bottom.label = "SOLANA_BOTTOM";
@@ -28,11 +25,10 @@ class Solana extends Phaser.Physics.Matter.Sprite{
 
         const compoundBody = Body.create({
           parts: [mainBody, this.sensors.top, this.sensors.bottom, this.sensors.left, this.sensors.right],
-          //parts: [mainBody],
           frictionStatic: 0.0,
-          frictionAir: 0.005,
-          friction: 0.005, //0.01
-          restitution: 0.01,
+          frictionAir: 0.08,
+          friction: 0.35, //0.01
+          restitution: 0.0,
           density: 0.01 //0.01
         });
        //Fix the draw offsets for the compound sprite.
@@ -49,21 +45,23 @@ class Solana extends Phaser.Physics.Matter.Sprite{
 
         //this.sprite.setIgnoreGravity(true);
         //Custom Properties
-        this.max_mv_speed = 2;
         this.hp = 5;
         this.max_hp = 5;
-        this.mv_speed = 1.5; //Was 2
+        this.max_mv_speed = {minX: -0.65,maxX: 0.65,minY: -4.9,maxY: 4.9, thrown: 10};
+        this.max_mv_speed_baseX = 0.65;
+        this.max_mv_speed_baseY = 4.9;
+        this.mv_speed = 0.007; //0.00214285
+        this.jump_speed = 0.045;//0.01846
         this.mv_direction = {x:0,y:0};
         this.prev_position = {x:0,y:0};
         this.control_lock = false;
         this.mv_Xdiff = 0;
         this.mv_Ydiff = 0;
-        this.jump_speed = 6;
         this.onGround = false;
         this.onWall = false;
         this.jumpReady = false;
         this.jumpCount = 0;
-        this.beingThrown = {ready: false, vec: {x:0,y:0}, max_speed: 4};
+        this.beingThrown = {ready: false, start:false, forgive: false, vec: {x:0,y:0}, max_speed: 4};
         this.alive = true;
         this.lastEntrance = null;
         this.invuln = false;
@@ -74,7 +72,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.isSlowed = false;
         //Create Light Shield
         this.isShielding = false;
-        this.LightShieldRadius = 36;
+        this.LightShieldRadius = 20;
         this.LightShieldCircle = new Phaser.Geom.Circle(this.x, this.y, this.LightShieldRadius);
         this.LightShield = new LightShield(this.scene,this.x+32,this.y,'solana_shield',0);
         this.LightShield.setActive(false);
@@ -91,15 +89,15 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.jumpLock = false;
         this.jumpLockTimer;
         this.kickOff = this.mv_speed;
-        this.hjs = 0;//Highest Jump Speed (-)
         //Controller
         this.controller;
         this.ctrlDevice;
         this.ctrlDeviceId = -1;
 
         //Create Particles
-        this.effect_dusty=this.scene.add.particles('shapes',  new Function('return ' + this.scene.cache.text.get('effect-dusty'))());
-        this.effect_dusty.emitters.list[0].startFollow(this,0,0,false);
+        this.effect_dusty=this.scene.add.particles('shapes',  new Function('return ' + this.scene.cache.text.get('effect-dusty'))());        
+        //this.effect_dusty.emitters.list[0].startFollow(this,0,0,false);
+        //This is not very efficent. I need to disable and only activate it when I need particles.
 
       }
 
@@ -111,9 +109,9 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             let mv_speed = this.mv_speed;//This will handle the modifications based on conditions/effects
             //Priority goes top to bottom, least speed to most speed
             if(this.isStunned){
-                mv_speed = .01;
+                mv_speed = 0;
             }else if(this.isSlowed){
-                mv_speed = 1.5;
+                mv_speed = 0.00214285;
             }
 
             //Only control if currently the active control object
@@ -155,23 +153,35 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                 //Check Jump ready
                 if (this.onGround || this.onWall || (soullight.ownerid == 0 && soullight.claimed && this.jumpCount < 2)) {
                     this.jumpReady = true;
-                    
 
-                    if (this.mv_direction.x == 0) {
-                        if (!this.isAnimLocked) { this.sprite.anims.play('solana-idle', true); };//Idle
-                    } else {
-                        if (!this.isAnimLocked) { this.sprite.anims.play('solana-walk', true); };
-                    }
-                } else {
-                    if (!this.isAnimLocked) { this.sprite.anims.play('solana-jump', true); };
+                } else {                    
                     //Add Jump Forgiveness of 100ms  
                     if (this.jumpTimerRunning == false) {
                         this.jumpTimer = this.scene.time.addEvent({ delay: 100, callback: this.forgiveJump, callbackScope: this, loop: false });
                         this.jumpTimerRunning = true;
                     }
-
                 }
 
+                //ANIMATION HANDLING
+                if (!this.onGround) { 
+                    if (!this.isAnimLocked) { this.sprite.anims.play('solana-jump', true); };
+                }else if (this.mv_direction.x == 0) {
+                    if (!this.isAnimLocked) { this.sprite.anims.play('solana-idle', true); };
+                } else {
+                    if (!this.isAnimLocked) { this.sprite.anims.play('solana-walk', true); };
+                }
+                
+                //Reset Being Throw status if touching any wall or groupd
+                if(this.beingThrown.forgive == false){
+                    if(this.touching.left > 0 
+                        || this.touching.right > 0 
+                        || this.touching.up > 0 
+                        || this.touching.down > 0
+                        || control_left
+                        || control_right){
+                        this.disableThrown();
+                    }
+                }
 
 
                 //Slow Descent if on Wall
@@ -199,15 +209,13 @@ class Solana extends Phaser.Physics.Matter.Sprite{
 
                         this.sprite.flipX = true; // flip the sprite to the left                    
                         this.mv_direction.x = -1;
-                        this.sprite.applyForce({ x: -mv / 700, y: 0 })
-                        //this.sprite.setVelocityX(-mv);
+                        this.sprite.applyForce({ x: -mv, y: 0 })
                     }
                     else if (control_right && this.jumpLock == false) {
 
                         this.sprite.flipX = false; // flip the sprite to the left                    
                         this.mv_direction.x = 1;
-                        this.sprite.applyForce({ x: mv / 700, y: 0 })
-                        //this.sprite.setVelocityX(mv);
+                        this.sprite.applyForce({ x: mv, y: 0 })
                     }
                     else if (!control_right && !control_left && this.jumpLock == false) {
 
@@ -222,10 +230,10 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                         if (control_passPress) { soullight.aimStart() };
                         if (control_passRelease) { soullight.aimStop(); };
                     }
-                    if (this.jumpLock) {
-                        //this.sprite.setVelocityX(this.kickOff);
-                        this.sprite.applyForce({ x: this.kickOff / 500, y: 0 })
-                    }
+                    // if (this.jumpLock) {
+                    //     //this.sprite.setVelocityX(this.kickOff);
+                    //     this.sprite.applyForce({ x: this.kickOff, y: 0 })
+                    // }
 
                     if (control_jump && this.jumpReady) {
                         this.jump(this.jump_speed, mv_speed);
@@ -271,27 +279,22 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                     }
                 }
             }
-            //this.drawDebugText([control_left,control_right]);
+            
         } // END IF ALIVE
         if(this.beingThrown.ready == true){
-            this.getThrown();            
-            if(this.body.velocity.x > this.beingThrown.max_speed ){this.setVelocityX(this.beingThrown.max_speed);};
-            if(this.body.velocity.x < -this.beingThrown.max_speed ){this.setVelocityX(-this.beingThrown.max_speed );};
+
+            if(this.beingThrown.start){this.getThrown();this.beingThrown.start = false;}            
+            if(this.body.velocity.x > this.max_mv_speed.thrown ){this.setVelocityX(this.max_mv_speed.thrown);};
+            if(this.body.velocity.x < -this.max_mv_speed.thrown ){this.setVelocityX(-this.max_mv_speed.thrown);};
+            if(this.body.velocity.y < -this.max_mv_speed.thrown ){this.setVelocityY(-this.max_mv_speed.thrown);};
+            if(this.body.velocity.y > this.max_mv_speed.thrown ){this.setVelocityY(this.max_mv_speed.thrown);};
         }else{
             //Set Max Velocities
-            if(this.body.velocity.x > this.max_mv_speed ){this.setVelocityX(this.max_mv_speed );};
-            if(this.body.velocity.x < -this.max_mv_speed ){this.setVelocityX(-this.max_mv_speed );};
-        }
-
-        let grnd_max_mv_sp = 2;
-        
-           
-        //Gravity caps Y
-        // if(this.body.velocity.y > this.max_mv_speed ){this.body.velocity.y = this.max_mv_speed};
-        // if(this.body.velocity.y < -this.max_mv_speed ){this.body.velocity.y = -this.max_mv_speed };
-           if(this.body.velocity.y > 4.9 ){this.setVelocityY(5);};
-
-
+            if(this.body.velocity.x > this.max_mv_speed.maxX ){this.setVelocityX(this.max_mv_speed.maxX);};
+            if(this.body.velocity.x < this.max_mv_speed.minX ){this.setVelocityX(this.max_mv_speed.minX);};
+            //if(this.body.velocity.y < -4.9 ){this.setVelocityY(-5);};
+            if(this.body.velocity.y > this.max_mv_speed.maxY ){this.setVelocityY(this.max_mv_speed.maxY+0.1);};//0.1 from Jenkins testing
+        }  
 
         //DO THIS LAST
         this.mv_Xdiff = Math.round(this.x - this.prev_position.x);
@@ -299,22 +302,12 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.prev_position.x = this.x;
         this.prev_position.y = this.y;
 
-        if(this.body.velocity.y < this.hjs){this.hjs = this.body.velocity.y};
-
-        //This had a lot of bugginess. Not sure why it was suggested. Was too easy to be true.
-        //CHange dynamic Body Property based on Y vel "UP"
-        // if(this.body.velocity.y < 0 && this.body.collisionFilter.category != CATEGORY.SOLANA_UP){
-        //     this.setCollisionCategory(CATEGORY.SOLANA_UP)
-        // }else if(this.body.velocity.y >= 0 && this.body.collisionFilter.category != CATEGORY.SOLANA){
-        //     this.setCollisionCategory(CATEGORY.SOLANA)
-        // }
-        
+        this.drawDebugText();
     }
-    drawDebugText(vals){
+    drawDebugText(){
         this.debug.setPosition(this.sprite.x, this.sprite.y-32);
-        this.debug.setText("jumpCount:"+String(this.jumpCount)
-        +" \nCtrl-LEFT/RIGHT:"+String(vals[0])+":"+String(vals[1]));
-        //+" \nVelocity:"+this.sprite.body.velocity.x.toFixed(4)+":"+this.sprite.body.velocity.y.toFixed(4));
+        this.debug.setText("beingThrown:"+String(this.beingThrown.ready)
+        +" \nVelocity:"+this.sprite.body.velocity.x.toFixed(4)+":"+this.sprite.body.velocity.y.toFixed(4));
         // +" \nWall L:"+String(this.touching.left)+" R:"+String(this.touching.right) + " oW:"+String(this.onWall)
         // +" \njr:"+String(this.jumpReady)
         // +" \njlck:"+String(this.jumpLock)
@@ -390,6 +383,12 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             this.effect_dusty.emitters.list[0].emitParticle(1,bVec.x+Phaser.Math.Between(-16,16),bVec.y);
         }
     }
+    setMaxMoveSpeed(xMin,xMax,yMin,yMax){
+        this.max_mv_speed.minX =  -this.max_mv_speed_baseX+xMin;
+        this.max_mv_speed.maxX = this.max_mv_speed_baseX+xMax;
+        this.max_mv_speed.minY = -this.max_mv_speed_baseY+yMin;
+        this.max_mv_speed.maxY = this.max_mv_speed_baseY+yMax;
+    }
     jumpLockReset(){
         this.jumpLock = false;
     }
@@ -401,9 +400,15 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.beingThrown.vec.x = xVel;
         this.beingThrown.vec.y = yVel;
         this.beingThrown.ready = true;
+        this.beingThrown.start = true;
+        this.beingThrown.forgive = true;
+        this.throwForgivenessTimer = this.scene.time.addEvent({ delay: time, callback: function(){this.beingThrown.forgive = false;}, callbackScope: this, loop: false });
     }
-    getThrown(){        
+    disableThrown(){
         this.beingThrown.ready = false;
+    }
+    getThrown(){  
+        //console.log(this.beingThrown.vec)           
         this.sprite.applyForce(this.beingThrown.vec);   
     }
     getVelocity(){
@@ -414,19 +419,18 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         if(this.body.velocity.y != 0){ // Was >
             this.setVelocityY(0);
         }
-        //Make vertical jump weaker if on wall
-        
+        //Make vertical jump weaker if on wall, only 70% as strong
+        mvVel = mvVel*.70;
+
         if(this.touching.left > 0 && !this.onGround){
-            this.sprite.applyForce({x:mvVel/1000,y:-0.003})
-            //this.sprite.setVelocityX(mvVel);
+            this.sprite.applyForce({x:mvVel,y:-0.003});
             this.jumpLock = true;
             this.kickOff = mvVel;
             this.jumpLockTimer = this.scene.time.addEvent({ delay: 200, callback: this.jumpLockReset, callbackScope: this, loop: false });
             
         }
         if(this.touching.right > 0 && !this.onGround){
-            this.sprite.applyForce({x:-mvVel/1000,y:-0.003})
-            //this.sprite.setVelocityX(-mvVel);
+            this.sprite.applyForce({x:-mvVel,y:-0.003});
             this.jumpLock = true;
             this.kickOff = -mvVel;
             this.jumpLockTimer = this.scene.time.addEvent({ delay: 200, callback: this.jumpLockReset, callbackScope: this, loop: false });
@@ -435,10 +439,10 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         //this.applyForce({x:0,y:-.025});
         if(this.onWall && this.onGround){
             //this.sprite.setVelocityY(-jumpVel*1.40);
-            this.sprite.applyForce({x:0,y:-jumpVel/325});
+            this.sprite.applyForce({x:0,y:-jumpVel});
         }else{
             //this.sprite.setVelocityY(-jumpVel);
-            this.sprite.applyForce({x:0,y:-jumpVel/325});
+            this.sprite.applyForce({x:0,y:-jumpVel});
         }
         
         this.soundJump.play("",{volume:.025});
@@ -631,10 +635,12 @@ class LightShield extends Phaser.Physics.Matter.Sprite{
 
         this
         .setExistingBody(compoundBody)
-        .setCollisionCategory(CATEGORY.MIRROR)
+        .setCollisionCategory(CATEGORY.SHIELD)
         .setCollidesWith([ 0 ]) // 0 Is nothing, 1 is everything, ~ is the inverse, so everything but the category
         .setPosition(x, y) // Sets inertia to infinity so the player can't rotate        
         .setIgnoreGravity(true);
+
+        this.setAlpha(0.65);
 
         this.holdConstraint = Phaser.Physics.Matter.Matter.Constraint.create({
             pointA: { x: x, y: y },

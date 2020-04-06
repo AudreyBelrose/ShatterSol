@@ -19,10 +19,10 @@
                 gravity: { y: 400 }
             },
             matter: {
-                gravity: { y: 0.65 },
-                positionIterations: 10, //8
-                velocityIterations: 8, //6
-                constraintIterations: 6 //2
+                gravity: { y: 1.5 },
+                positionIterations: 12, //8
+                velocityIterations: 10, //6
+                constraintIterations: 8 //2
             }
         },
         // Install the scene plugin
@@ -50,7 +50,7 @@
     //Tiles
     var map; 
     var mapTileSize = {tw:32,th:32};
-    var current_map = "m1s1";
+    var current_map = "m6s1";
     var current_exit = "west1";
     var world_backgrounds = [];
     //Map Configurations - Each level will have a name from the preloader. The tsKey will also come from the preloader. The tsName is from Tiled.
@@ -70,6 +70,14 @@
             {tsName:'mainlevbuild_B',tsKey:'PF_Caslte_1_0_mainlevbuild_B'}
         ],
         backgrounds:['PF_Caslte_1_0_background_day1','PF_Caslte_1_0_background_day2','PF_Caslte_1_0_background_day3']
+        },
+        {name:'m6s1',
+        tsPairs:[
+            {tsName:'mainlevbuild1',tsKey:'PF_SET3_v1_0_mainlevbuild1'},
+            {tsName:'mainlevbuild2',tsKey:'PF_SET3_v1_0_mainlevbuild2'},
+            {tsName:'mainlevbuild3',tsKey:'PF_SET3_v1_0_mainlevbuild3'}
+        ],
+        backgrounds:['PF_SET3_v1_0_background4']
         }
     ]
 
@@ -139,7 +147,9 @@
         GROUND: 128,
         SOLID: 256,
         ENEMY: 512,
-        SOLANA_UP: 1024
+        SOLANA_UP: 1024,
+        SHIELD: 2048
+
     }
     const DEPTH_LAYERS = {
         BG: 10,

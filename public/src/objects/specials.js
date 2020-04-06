@@ -144,13 +144,15 @@ class Rock extends Phaser.Physics.Matter.Sprite{
 
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         const { width: w, height: h } = this;
-        const mainBody =  Bodies.circle(0,0,w*.50);
+        //const mainBody =  Bodies.circle(0,0,w*.50);
+        const mainBody =  Bodies.polygon(0,0,32,w*.50);
 
         const compoundBody = Body.create({
             parts: [mainBody],
-            frictionStatic: 0.1,
+            frictionStatic: 0.01,
             frictionAir: 0.05,
-            friction: 0.3,
+            friction: 1.0,
+            density: 0.5,
             label: "ROCK"
         });
 
@@ -170,7 +172,7 @@ class Rock extends Phaser.Physics.Matter.Sprite{
                 }
             }
         });
-        this.max_speed = 8;
+        this.max_speed = 5;
         this.sound_gotCrushed = game.sound.add('hitting_wall',{volume: 0.04});
     }
     setup(x,y,scale){
@@ -185,7 +187,7 @@ class Rock extends Phaser.Physics.Matter.Sprite{
     {       
         if(this.body.velocity.x > this.max_speed){this.setVelocityX(this.max_speed)};
         if(this.body.velocity.x < -this.max_speed){this.setVelocityX(-this.max_speed)};
-        if(this.body.velocity.y > this.max_speed){this.setVelocityY(this.max_speed)};
+        if(this.body.velocity.y > this.max_speed){this.setVelocityY(this.max_speed);};
         if(this.body.velocity.y < -this.max_speed){this.setVelocityY(-this.max_speed)};
     }
     setReadyCrush(){
@@ -198,15 +200,28 @@ class Rock extends Phaser.Physics.Matter.Sprite{
             let speed = Math.sqrt(Math.pow(fromBody.velocity.x,2)+Math.pow(fromBody.velocity.y,2));
             let force = speed*fromBody.density*100;
             if(force >= 2){                
-                console.log("Rock Impact", force >> 0,speed >> 0,fromBody.density);
-                if(this.scale > .25){
-                    for(let r=0;r< Phaser.Math.Between(1,3);r++){
-                        let newRock = rocks.get();
-                        newRock.setup(this.x,this.y,this.scale*.75);                        
+                //console.log("Rock Impact", force >> 0,speed >> 0,fromBody.density);
+                if(Phaser.Math.Between(1,5) == 1){ //20%
+                    if(this.scale > .25){
+                        for(let r=0;r< Phaser.Math.Between(1,3);r++){
+                            let newRock = rocks.get();
+                            newRock.setup(this.x,this.y,this.scale*.75);                        
+                        }
                     }
+                    this.getShards();
+                    this.destroy();
+                }else{
+                    this.getShards();
+                    this.destroy();
                 }
-                this.destroy();
+
             }
+        }
+    }
+    getShards(){
+        for(let i=0;i < Phaser.Math.Between(1,3);i++){
+            let ls = light_shards.get();
+            ls.spawn(this.x,this.y,300,solana);
         }
     }
 };
@@ -341,14 +356,14 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
             callback: eventData => {
                 const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
                 
-                if (gameObjectB !== undefined && gameObjectB instanceof Bright) {
+                if (gameObjectB !== undefined && gameObjectB instanceof BrightSensors) {
                     this.impact(gameObjectB);
                 }
             }
         });
         //Breakable detail sprite
         this.detailSprite = this.scene.add.sprite(this.x,this.y,'breakablecracks').setDepth(DEPTH_LAYERS.FG);
-
+        this.crushThreshold = 2;
         this.max_speed = 8;
         this.breakFrame = 0;
         this.breakFrames = [0,1,2,3,4];
@@ -366,10 +381,7 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
     }
     update(time, delta)
     {       
-        if(this.body.velocity.x > this.max_speed){this.setVelocityX(this.max_speed)};
-        if(this.body.velocity.x < -this.max_speed){this.setVelocityX(-this.max_speed)};
-        if(this.body.velocity.y > this.max_speed){this.setVelocityY(this.max_speed)};
-        if(this.body.velocity.y < -this.max_speed){this.setVelocityY(-this.max_speed)};
+
     }
     setReadyCrush(){
         this.readyCrush = true;
@@ -377,22 +389,24 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
     impact(obj){
         if(this.readyCrush){
             this.readyCrush = false;
+            //this.setCollidesWith([ 0 ]) ;
             this.crushTimer = this.scene.time.addEvent({ delay: 300, callback: this.setReadyCrush, callbackScope: this, loop: false });
-            let fromBody = obj.body;
+            let fromBody = bright.body;
             let speed = Math.sqrt(Math.pow(fromBody.velocity.x,2)+Math.pow(fromBody.velocity.y,2));
-            let force = speed*fromBody.density*100;
-            console.log("Crush Force", force,this.breakFrames.length);
-            if(force >= 2){                
-                this.breakFrame = this.breakFrame + Math.round(force);
-                if(this.breakFrame < this.breakFrames.length){
-                    this.detailSprite.setFrame(this.breakFrames[this.breakFrame]);
-                }else{
-                    this.detailSprite.destroy();
-                    this.destroy();
-                }
-                
-                
+            let force = speed*fromBody.mass;
+           
+            // //Using Matter magnitude.
+            // var bodyAMomentum = Phaser.Physics.Matter.Matter.Vector.mult(fromBody.velocity, fromBody.mass);
+            // var bodyBMomentum = Phaser.Physics.Matter.Matter.Vector.mult({x:0,y:0}, 0);
+            // var relativeMomentum = Phaser.Physics.Matter.Matter.Vector.sub(bodyAMomentum, bodyBMomentum);
+            if(force >= this.crushThreshold || this.breakFrame >= this.breakFrames.length ){
+                this.detailSprite.destroy();
+                this.destroy();
+            }else if(force >= 0){
+                this.breakFrame = this.breakFrame + Math.round(force) < this.breakFrames.length ? this.breakFrame + Math.round(force) : this.breakFrames.length;
+                this.detailSprite.setFrame(this.breakFrames[this.breakFrame]);
             }
+
         }
     }
 };
@@ -742,5 +756,60 @@ class Telebeam extends Phaser.Physics.Matter.Sprite{
             },
             onCompleteParams: [this]
         });
+    }
+};
+
+//Junk
+
+//RockChute
+class RockChute extends Phaser.Physics.Matter.Sprite{
+    constructor(scene,x,y) {
+        super(scene.matter.world, x, y, 'rockchute', 0)
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+
+        this.setActive(true);
+
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        //const mainBody =  Bodies.circle(0,0,w*.50);
+        const mainBody =  Bodies.rectangle(0,0,w,h);
+
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0.01,
+            frictionAir: 0.05,
+            friction: 1.0,
+            density: 0.5,
+            label: "CHUTE"
+        });
+
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setCollidesWith([0])//Nothing
+        .setPosition(x, y)
+        .setStatic(true) 
+        
+        this.rockTimer = this.scene.time.addEvent({ delay: 3000, callback: this.makeRocks, callbackScope: this, loop: true });        
+        //this.scene.events.on("update", this.update, this);
+    
+    }
+    setup(x,y){
+        this.setActive(true);
+        this.setPosition(x,y); 
+    }
+    update(time, delta)
+    {   
+        
+    }
+    makeRocks(){
+        if(rocks.getTotalUsed() < 5){ // NO more rocks than 5
+            let newRock = rocks.get(this.x,this.y);
+            //newRock.setup(this.x,this.y, 1);
+            newRock.setVelocityY(0);
+            newRock.applyForce({x:Phaser.Math.FloatBetween(0.01,0.02),y:0});        
+        }
     }
 };

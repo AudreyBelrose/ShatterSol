@@ -17,7 +17,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
           frictionAir: 0.3,
           friction: 0.3,
           restitution: 0.00,
-          density: .05,
+          density: 0.05,
           label: "BRIGHT"
         });
         this.sprite
@@ -29,7 +29,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y)
         .setIgnoreGravity(true);
         
-        this.bg = this.scene.add.image(x,y,'bright',0);
+        this.bg = this.scene.add.image(x,y,'bright',0).setVisible(false);
         this.scene.tweens.add({
             targets: this.bg,
             rotation: (Math.PI*2),              
@@ -48,8 +48,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.hp = 1;
         this.max_hp = 1;
         this.mv_speed = 2;
-        this.roll_speed = .4;
-        this.jump_speed = 6;
+        this.roll_speed = 0.400;
+        this.jump_speed = 0.020;
         this.max_speed = {air:2,ground:5};
         this.alive = true;
         this.falling = false;
@@ -284,7 +284,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     }
                     //Dark Jump
                     if(control_jump && this.airTime <=  10){
-                        this.sprite.setVelocityY(-this.jump_speed);
+                        this.sprite.applyForce({x:0,y:-this.jump_speed});
                     }
 
                     //Singularity
@@ -412,6 +412,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.sprite.setIgnoreGravity(false);
         this.sprite.setCollisionCategory(CATEGORY.DARK);
         this.sprite.setDensity(0.01);//0.01
+        this.bg.setVisible(false);
     }
     toBright(){
         this.light_status = 0;
@@ -421,6 +422,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.sprite.setIgnoreGravity(true);
         this.sprite.setCollisionCategory(CATEGORY.BRIGHT);
         this.sprite.setDensity(0.01);
+        this.bg.setVisible(true);
         //Tween back to straight up
         this.reAlignBright();
     }
@@ -497,7 +499,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         //Throw Power
         let power =  this.abPulse.c/1000;
 
-        this.abPulse.vec = {x:Math.cos(angle)*power,y:Math.sin(angle)*power};
+        this.abPulse.vec = {x:Math.cos(angle)*(power+power*0.5),y:Math.sin(angle)*power};//50% more power to X velocity
     }
     pulseThrow(object){
         object.removeControlLock();
@@ -507,8 +509,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
         this.abPulse.doCharge = false;
         this.effect[0].setVisible(false);
- 
-        object.applyForce(this.abPulse.vec);
+        object.readyThrown(this.abPulse.vec.x,this.abPulse.vec.y,30); 
         
         this.abPulse.c = 0;
     }
