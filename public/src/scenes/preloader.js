@@ -166,6 +166,7 @@ var Preloader = new Phaser.Class({
 		this.load.tilemapTiledJSON('m1s1', 'assets/world/m1s1.json');
 		this.load.tilemapTiledJSON('m1s1a', 'assets/world/m1s1a.json');
 		this.load.tilemapTiledJSON('m6s1', 'assets/world/m6s1.json');
+		this.load.tilemapTiledJSON('m6s1a', 'assets/world/m6s1a.json');
 		//Map Tilesets
 		this.load.tilemapTiledJSON('storymap_forest_1', 'assets/world/storyboard_forest1.json');  
 		this.load.spritesheet('tiles32', 'assets/world/oldTileset32.png', {frameWidth: 32, frameHeight: 32, spacing: 2}); 
@@ -278,6 +279,7 @@ var Preloader = new Phaser.Class({
 		this.load.image('light1', 'assets/objects/light1.png');
 		this.load.image('shadow', 'assets/world/shadow.png');
 		this.load.image('exit', 'assets/objects/exit.png');
+		this.load.spritesheet('exit_marker', 'assets/objects/exit_marker.png', {frameWidth: 64, frameHeight: 64});
 		this.load.image('entrance', 'assets/objects/entrance.png');
 		this.load.image('gate', 'assets/objects/gate.png');
 		this.load.image('triggerzone', 'assets/objects/triggerzone.png');

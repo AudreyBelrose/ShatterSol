@@ -78,6 +78,14 @@
             {tsName:'mainlevbuild3',tsKey:'PF_SET3_v1_0_mainlevbuild3'}
         ],
         backgrounds:['PF_SET3_v1_0_background4']
+        },
+        {name:'m6s1a',
+        tsPairs:[
+            {tsName:'mainlevbuild1',tsKey:'PF_SET3_v1_0_mainlevbuild1'},
+            {tsName:'mainlevbuild2',tsKey:'PF_SET3_v1_0_mainlevbuild2'},
+            {tsName:'mainlevbuild3',tsKey:'PF_SET3_v1_0_mainlevbuild3'}
+        ],
+        backgrounds:['PF_SET3_v1_0_background4']
         }
     ]
 
@@ -148,7 +156,8 @@
         SOLID: 256,
         ENEMY: 512,
         SOLANA_UP: 1024,
-        SHIELD: 2048
+        SHIELD: 2048,
+        BOSS: 4096
 
     }
     const DEPTH_LAYERS = {
