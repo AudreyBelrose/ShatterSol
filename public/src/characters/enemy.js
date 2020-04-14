@@ -115,7 +115,7 @@ class Enemy extends Phaser.Physics.Matter.Sprite{
         this.waypoints = [Phaser.Math.Vector2(this.x,this.y)];
         this.waypointsIndex = 0;
         this.distanceToSolana = 99999;
-        this.wpSpeedMod = {x:4,y:1};
+        this.wpSpeedMod = {x:2,y:1};
 
     }
     update(time, delta)
@@ -178,7 +178,7 @@ class Enemy extends Phaser.Physics.Matter.Sprite{
         {
             this.anims.play(this.texture.key+'-shoot', true);            
             
-            bullet.setCollidesWith([ CATEGORY.GROUND,CATEGORY.SOLID, CATEGORY.SOLANA, CATEGORY.MIRROR ]);
+            bullet.setCollidesWith([ CATEGORY.GROUND, CATEGORY.SOLID, CATEGORY.SOLANA, CATEGORY.MIRROR ]);
             bullet.setBounce(0.95);
             if(this.behavior.weapon.aimmed){
                 let aimVec = this.aim(solana); //Just use X value for now. Probably want to have adjustable weapon speed later.

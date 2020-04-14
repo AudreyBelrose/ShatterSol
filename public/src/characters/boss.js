@@ -247,13 +247,32 @@ class BossSlime extends Phaser.Physics.Matter.Sprite{
         });
         this.anims.play('boss_slime_bite',true);
         this.scene.events.on("update", this.update, this);
+        
+        this.scene.events.on("shutdown", this.remove, this);
+        this.scene.events.on("destroy", function(){console.log("BOSS Instance: Scene Destroy Event");}, this);
+
+        //BUG- Boss needs to be cleaned up on Scene Shutdown/Destroy. Because I'm using events, timers and globals, it is causing issues on restart.
 
         //Columns - these need to be their own matter objects that can slam into the player and/or bright
-        this.tentacle1Comp = this.scene.matter.add.stack(this.x,this.y,1,4,4,4,function(x,y){
-            return Bodies.rectangle(x,y,32,32)
-        });
-        this.tentacle1Chain = this.scene.matter.add.chain(this.tentacle1Comp,0.5, 0, -0.5, 0, { stiffness: 1});
-        console.log(this.tentacle1Chain);
+        // this.tentacle1Comp = this.scene.matter.add.stack(this.x,this.y,1,4,4,4,function(x,y){
+        //     return Bodies.rectangle(x,y,32,32)
+        // });
+        // this.tentacle1Chain = this.scene.matter.add.chain(this.tentacle1Comp,0.5, 0, -0.5, 0, { stiffness: 1});
+        // console.log(this.tentacle1Chain);
+
+        this.bst1 = new BossSlimeTentacle(this,this.x-this.width/2,this.y+this.height/2-16,6);
+        this.bst2 = new BossSlimeTentacle(this,this.x+this.width/2,this.y+this.height/2-16,6);
+        this.bst1a = new BossSlimeTentacle(this,this.x-this.width/4,this.y+this.height/2-16,3);
+        this.bst2a = new BossSlimeTentacle(this,this.x+this.width/4,this.y+this.height/2-16,3);
+
+        this.attacking = true;
+        this.tentacleTimer = this.scene.time.addEvent({ delay: 30000, callback: function(){
+            
+            this.attacking = false;
+
+        }, callbackScope: this, loop: false});
+
+
 
         //Acid
         this.acidFrame = 0;
@@ -263,10 +282,80 @@ class BossSlime extends Phaser.Physics.Matter.Sprite{
             if(this.acidFrame >= this.acidpool.displayTexture.frameTotal-1){this.acidFrame=0;};
             this.acidpool.setFrame(this.acidFrame);
         }, callbackScope: this, loop: true }); 
+
+        //Stats
+        this.alive = true;
     
     }
     update(time, delta)
     {   
-        
+        if(this.attacking && this.alive){
+            this.bst1.setGraspVelocity(0,-5);
+            this.bst2.setGraspVelocity(0,-5); 
+            this.bst1a.setGraspVelocity(0,-5);
+            this.bst2a.setGraspVelocity(0,-5);  
+        }
+    }
+    remove(){
+        this.alive = false;
+        this.acidTimer.destroy();
+        this.bst1.remove();
+        this.bst1a.remove();
+        this.bst2.remove();
+        this.bst2a.remove();
+        this.destroy();
     }
 };
+
+class BossSlimeTentacle{
+    constructor(parent,pX,pY,links,dir){
+        //Make tentacle by using joints
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules   
+        this.base = parent.scene.matter.add.image(pX, pY-16, 'boss_slime_column', null, { shape: 'rectangle', chamfer: { radius: 5 }, mass: 200, restitution: 0.0, friction: 0.5, frictionAir: 0.5 });
+        Body.scale(this.base.body,0.75,0.75);
+        this.base.setFixedRotation();        
+        this.base.setIgnoreGravity(true);
+        this.base.setCollisionCategory(CATEGORY.BOSS)
+        this.base.setStatic(true);
+        //base.setCollidesWith([0]);//Nothing
+        // this.scene.matter.add.joint(this,base, 4, 1,{
+        //     pointA: { x: -this.width/2, y: this.height/2 },
+        //     pointB: { x: 0, y: base.height/2 }
+        // });
+        //Add 6 Joints, and then a cap
+        this.stack = [];
+        this.blendStack = [];
+        for(let j=0;j < links;j++){
+            let tBody = parent.scene.matter.add.image(pX, this.base.y-(24*(j+1)), 'boss_slime_column', null, { shape: 'rectangle', chamfer: { radius: 5 }, mass: 0.3, restitution: 0.0, friction: 0.5, frictionAir: 0.03 });
+            Body.scale(tBody.body,0.75,0.75);
+            tBody.setCollisionCategory(CATEGORY.BOSS)
+            tBody.setCollidesWith([CATEGORY.GROUND,CATEGORY.BOSS]);//Nothing
+            //tBody.setIgnoreGravity(true);
+            let sBody = (j==0)?this.base:this.stack[j-1];
+            parent.scene.matter.add.joint(sBody,tBody, 1, 1,{
+                pointA: { x: 0, y: -tBody.height/2+4 },
+                pointB: { x: 0, y: tBody.height/2-4 },
+            });
+            this.stack.push(tBody);
+            //this.blendStack.push(parent.scene.add.image(pX, this.base.y-(38*(j+1))-tBody.height/2,'boss_slime_column',1));
+        }
+        this.cap = parent.scene.matter.add.image(pX, this.stack[this.stack.length-1].y-24, 'boss_slime_column', 3, { shape: 'rectangle', mass: 1, chamfer: { radius: 15 }, restitution: 0.0, friction: 0.5, frictionAir: 0.03 });
+        Body.scale(this.cap.body,0.75,0.75);
+        let cap = this.cap;
+        parent.scene.matter.add.joint(this.stack[this.stack.length-1],cap, 1, 1,{                
+            pointA: { x: 0, y: -cap.height/2+4 },
+            pointB: { x: 0, y: cap.height/2-4 },
+        });
+        this.cap.setCollisionCategory(CATEGORY.BOSS)
+        this.cap.setCollidesWith([CATEGORY.SOLANA, CATEGORY.DARK, CATEGORY.GROUND]);
+    }
+    setGraspVelocity(x,y){
+        this.cap.setVelocity(x,y);
+    }
+    remove(){
+        this.base.destroy();
+        this.stack.forEach(e=>{e.destroy();});
+        this.cap.destroy(); 
+
+    }
+}

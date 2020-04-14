@@ -44,7 +44,7 @@ var GameScene = new Phaser.Class({
         mapTileSize.th = map.tileHeight;
         //Get the lvl config from config.js object
         let lvlCfg = getLevelConfigByName(current_map);
-        console.log(map);
+        //console.log(map);
         //Create Background - This will need to be custom based on the map.
         lvlCfg.backgrounds.forEach(e=>{
             world_backgrounds.push(this.add.tileSprite(512, 256, map.widthInPixels*2, map.heightInPixels*2, e));
@@ -203,7 +203,7 @@ var GameScene = new Phaser.Class({
             }
             shapeObject.setVisible(false);
             shapeObject.setStatic(true);
-            shapeObject.setCollisionCategory(CATEGORY.SOLID) 
+            shapeObject.setCollisionCategory(CATEGORY.GROUND) 
             shapeObject.body.label = 'GROUND'; 
             //console.log("Poly Object",shapeObject);
             //Need to add light blocking polygon check here.
@@ -917,7 +917,7 @@ var GameScene = new Phaser.Class({
                 }
 
                 if (gameObjectB !== undefined && gameObjectB instanceof TMXZone) {
-                    gameObjectB.enterZone(bright);
+                    gameObjectB.enterZone(bright,1);
                 } 
             }
         });
@@ -979,7 +979,7 @@ var GameScene = new Phaser.Class({
               }
               //Solana Enters a zone trigger
               if (gameObjectB !== undefined && gameObjectB instanceof TMXZone) {
-                    gameObjectB.enterZone(solana);
+                    gameObjectB.enterZone(solana,0);
               }
 
               if (gameObjectB !== undefined && gameObjectB instanceof NPCSensor) {
@@ -1048,27 +1048,9 @@ var GameScene = new Phaser.Class({
                 //I need to clean this up and remove redundant code. I could use label lists and a check function to handle
                 //the results.
 
-                //Between Bullets and SOLID
-                if ((bodyA.label === 'BULLET' && bodyB.label === 'SOLID') || (bodyA.label === 'SOLID' && bodyB.label === 'BULLET')) {
-                    //Get Bullet Object and run hit function
-                    const bulletBody = bodyA.label === 'BULLET' ? bodyA : bodyB;
-                    const bulletObj = bulletBody.gameObject;
-                    emitter0.active = true;
-                    emitter0.explode(5,bulletObj.x,bulletObj.y);
-                    bulletObj.hit();
-                }
-                //Between Bullets and GROUND
-                if ((bodyA.label === 'BULLET' && bodyB.label === 'GROUND') || (bodyA.label === 'GROUND' && bodyB.label === 'BULLET')) {
-                    //Get Bullet Object and run hit function
-                    const bulletBody = bodyA.label === 'BULLET' ? bodyA : bodyB;
-                    const bulletObj = bulletBody.gameObject;
-                    emitter0.active = true;
-                    emitter0.explode(5,bulletObj.x,bulletObj.y);
-                    bulletObj.hit();
-                }
-                //Between Bullets and CRATE
-                if ((bodyA.label === 'BULLET' && bodyB.label === 'CRATE') || (bodyA.label === 'CRATE' && bodyB.label === 'BULLET')) {
-                    //Get Bullet Object and run hit function
+                //Better function for checking bullets with impact but not additional things
+                let bulletHitList1 = ['SOLID','GROUND','CRATE','PLATFORM'];
+                if((bodyA.label == 'BULLET' && bulletHitList1.includes(bodyB.label)) || (bodyB.label == 'BULLET' && bulletHitList1.includes(bodyA.label)) ){
                     const bulletBody = bodyA.label === 'BULLET' ? bodyA : bodyB;
                     const bulletObj = bulletBody.gameObject;
                     emitter0.active = true;
@@ -1138,16 +1120,10 @@ var GameScene = new Phaser.Class({
                     if (gObjs[0].active){
                         gObjs[0].hit(0);
                     }  
-                }
-                //Between SoulTransfer and Solid
-                if ((bodyA.label === 'SOULTRANSFER' && bodyB.label === 'SOLID') || (bodyA.label === 'SOLID' && bodyB.label === 'SOULTRANSFER')) {
-                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULTRANSFER');
-                    if (gObjs[0].active){
-                        gObjs[0].burn();
-                    }  
-                }
-                //Between SoulTransfer and Ground
-                if ((bodyA.label === 'SOULTRANSFER' && bodyB.label === 'GROUND') || (bodyA.label === 'GROUND' && bodyB.label === 'SOULTRANSFER')) {
+                }                
+                //Between SoulTransfer and Solid/Ground
+                let SoulTransferBurnList1 = ['SOLID','GROUND'];
+                if((bodyA.label == 'SOULTRANSFER' && bulletHitList1.includes(bodyB.label)) || (bodyB.label == 'SOULTRANSFER' && bulletHitList1.includes(bodyA.label)) ){
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULTRANSFER');
                     if (gObjs[0].active){
                         gObjs[0].burn();
@@ -1247,14 +1223,14 @@ var GameScene = new Phaser.Class({
 
         }
 
-        console.log("player Configs:",gamePad,playerModes[playerMode],playerConfig);
+        //console.log("player Configs:",gamePad,playerModes[playerMode],playerConfig);
 
         //TIME SCALE
         let timeScale = 1;
         this.tweens.timeScale = timeScale; // tweens
         this.matter.world.engine.timing.timeScale = timeScale; // physics
         this.time.timeScale = timeScale; // time events
-        console.log(this.time);
+        //console.log(this.time);
 
         //Draw Point area debug
         this.debugPointer = this.add.graphics();

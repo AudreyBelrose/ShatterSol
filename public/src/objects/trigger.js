@@ -155,6 +155,7 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
         this.isClosed = true;
         this.closedPos = {x:x,y:y};
         this.openPos = {x:x+this.mvdir.x,y:y+this.mvdir.y}
+        this.autoClose = properties.autoclose == undefined ? false : properties.autoclose;
         if(properties.customScale){
             //Run Custom Scaling
             let newScale = JSON.parse(properties.customScale);
@@ -189,7 +190,7 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
                     ease: 'Power1',
                     duration: 3000,
                     onComplete: this.openComplete,
-                    onCompleteParams: [ this, false ]
+                    onCompleteParams: [ this, true ]
                 });
             }else{
                 this.scene.tweens.add({
@@ -199,7 +200,7 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
                     ease: 'Power1',
                     duration: 3000,
                     onComplete: this.openComplete,
-                    onCompleteParams: [ this, true ]
+                    onCompleteParams: [ this, false ]
                 });
             }            
         }
@@ -208,7 +209,8 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
     openComplete(tween, targets, myGate, state){
         //console.log("Gate Tween Finished");
         myGate.ready = true;
-        this.isClosed = state;
+        myGate.isClosed = !state;
+        if(myGate.autoClose && state){myGate.activateTrigger();}
     }
 };
 
@@ -435,11 +437,11 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
         this.alpha = 0.0;
         this.name = name;
         this.target = {name: -1,type: -1, object: -1};
-        this.ready = true;
+        this.ready = [true,true];
         this.zonedata = {type:'trigger',value:0};
         this.allowReset = false;
         this.resetDelay = 100;
-        this.resetTimer = -1;
+        this.resetTimer = [-1,-1];
         this.effect = -1;
         this.zoneWidth = w;
         this.zoneHeight = h;
@@ -452,7 +454,7 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
             this.zonedata.value = properties.zoneValue;
             this.allowReset = properties.allowReset;
             this.resetDelay =properties.resetDelay;
-            this.ready = properties.ready != undefined ? properties.ready : true;
+            this.ready = properties.ready != undefined ? [properties.ready,properties.ready] : [true,true];
         }
         //Types:
         //Target: Triggers a target
@@ -512,31 +514,34 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
     }
     setTarget(targetObject){
         this.target.object = targetObject;
-        console.log("Set target for ", this.name);
     }
-    triggerReset(){
-        this.ready  = true;
+    triggerReset(playerid){
+        this.ready[playerid]  = true;
     }
-    triggerTarget(){
+    triggerTarget(playerid){
         if(this.target.object != -1){
-            this.target.object.activateTrigger();
+            this.target.object.activateTrigger(playerid);
         }
     }
-    activateTrigger(){
-        this.ready  = true;
+    activateTrigger(playerid){
+        this.ready[playerid]  = true;
         if(this.zonedata.type == "teleport"){
             this.effect[0].setActive(true);
             this.teleporterGradeient.setVisible(true);
         }
     }
-    enterZone(obj){
+    useZone(playerid){
+
+    }
+    enterZone(obj,id){
         //Do something base on zome type
-        if(this.ready == true){
-            this.ready = false;
+
+        if(this.ready[id] == true){
+            this.ready[id] = false;
             //Solana Specific Functions
-            if(obj instanceof Solana){
+            if(id == 0){
                 if(this.zonedata.type == "target"){
-                    this.triggerTarget();
+                    this.triggerTarget(id);
                 }
                 if(this.zonedata.type == "hurt"){
                     let hurtParse = JSON.parse(this.zonedata.value);
@@ -579,7 +584,7 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
             }
 
             if(this.allowReset){
-                this.resetTimer = this.scene.time.addEvent({ delay: this.resetDelay, callback: this.triggerReset, callbackScope: this, loop: false });
+                this.resetTimer[id] = this.scene.time.addEvent({ delay: this.resetDelay, callback: this.triggerReset, args:[id], callbackScope: this, loop: false });
             }
          
         }
@@ -635,13 +640,13 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
             callback: eventData => {
                 const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
                 
-                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana && !gameObjectA.immobile) {
                     let bVelX = gameObjectA.body.velocity.x;
                     let bVelY = gameObjectA.body.velocity.y;
                     let minX = bVelX < 0 ? bVelX : 0;
                     let maxX = bVelX > 0 ? bVelX : 0;
                     let minY = bVelY < 0 ? bVelY : 0;
-                    let maxY = bVelY < 0 ? bVelY : 0;
+                    let maxY = bVelY > 0 ? bVelY : 0;
                     gameObjectB.setMaxMoveSpeed(minX,maxX,minY,maxY);
                 }
             }
@@ -651,7 +656,7 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
             callback: eventData => {
                 const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
                 
-                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana && !gameObjectA.immobile) {
                     gameObjectB.setMaxMoveSpeed(0,0,0,0);
                 }
             }
@@ -668,13 +673,18 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         this.target = {name: -1,type: -1, object: -1};
         this.ready = true;
         this.setHighSpeed = 0;
+        this.immobile = true;
         if(properties){
             this.target.name = properties.targetName;
             this.target.type = properties.targetType;
             this.path = JSON.parse(properties.path);
         }
-    
-       this.setPath(this.path) // test tween
+       if(this.path){ 
+            this.setPath(this.path) // test tween
+            this.immobile = false;
+       }else{
+           this.immobile = true;
+       }
        this.prev = {x:x,y:y};
  
     }
