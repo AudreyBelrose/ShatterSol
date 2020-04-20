@@ -239,7 +239,7 @@ var Preloader = new Phaser.Class({
         this.load.spritesheet('soul_light', 'assets/characters/soul_light.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('mirror', 'assets/objects/mirror2.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('lever', 'assets/objects/lever.png', {frameWidth: 32, frameHeight: 32});
-		this.load.spritesheet('pressure_plate', 'assets/objects/pressure_plate.png', {frameWidth: 32, frameHeight: 6});
+		this.load.spritesheet('pressure_plate', 'assets/objects/pressure_plate.png', {frameWidth: 32, frameHeight: 16});
 		this.load.spritesheet('tmxbutton', 'assets/objects/tmxbutton.png', {frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('platform_160x16', 'assets/objects/platform_160x16.png', {frameWidth: 160, frameHeight: 16});
 		this.load.spritesheet('light_crystal', 'assets/objects/light_crystal.png', {frameWidth: 16, frameHeight: 16});
@@ -294,7 +294,7 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('hud_energybar1','assets/hud/hud_energybar1.png',{frameWidth: 16, frameHeight: 96});		
 		this.load.spritesheet('hud_energybar3','assets/hud/hud_energybar3.png',{frameWidth: 192, frameHeight: 24});	
 		this.load.spritesheet('hud_energybar3_solana_head','assets/hud/hud_energybar3_solana_head.png',{frameWidth: 32, frameHeight: 32});
-		this.load.spritesheet('hud_energybar3_bright_head','assets/hud/hud_energybar3_bright_head.png',{frameWidth: 32, frameHeight: 32});		
+		this.load.spritesheet('hud_energybar3_bright_head','assets/hud/hud_energybar3_bright_head.png',{frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('hud_corruptionbar1','assets/hud/hud_corruptionbar1.png',{frameWidth: 16, frameHeight: 96});
 		//Make these talking animations later		
 		this.load.image('hud_solana_head', 'assets/hud/hud_Solana_head.png');
@@ -311,6 +311,9 @@ var Preloader = new Phaser.Class({
 		this.load.image('lightburst-1', 'assets/effects/lightburst-1.png');
 		this.load.spritesheet('doublejump-1', 'assets/effects/doublejmp.png',{frameWidth: 24, frameHeight: 24});
 		this.load.spritesheet('wind-1', 'assets/effects/wind1.png',{frameWidth: 32, frameHeight: 32});
+		//Water // https://github.com/jorbascrumps/phaser-plugin-water-body
+		this.load.image('droplet', 'assets/effects/water/droplet.png');
+		this.load.image('water', 'assets/effects/water/water.jpg');
 
 		// font
 		this.load.bitmapFont('fontwhite', 'img/fontwhite.png', 'img/fontwhite.xml');
