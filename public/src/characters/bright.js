@@ -45,13 +45,14 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
         //Custom properties
         this.light_status = 0;//0 - Bright, 1 - Dark;
-        this.hp = 1;
-        this.max_hp = 1;
+        this.hp = 5;
+        this.max_hp = 5;
         this.mv_speed = 3;
         this.roll_speed = 0.400;
         this.jump_speed = 0.020;
         this.max_speed = {air:10,ground:10};
         this.alive = true;
+        this.invuln = false;
         this.falling = false;
         this.debug = this.scene.add.text(this.x, this.y-16, 'bright', { resolution: 2, fontSize: '10px', fill: '#00FF00' });
         this.touching = {up:0,down:0,left:0,right:0};
@@ -195,10 +196,20 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     }
 
                     //Passing Soulight
-                    if(soullight.ownerid == 1){
-                        if(control_passPress){soullight.aimStart();};
-                        if(control_passRelease){soullight.aimStop();};
-                    }
+                    if (control_passPress && soullight.ownerid == 1) {        
+                        let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:soullight.x,y:soullight.y});                  
+                        if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) > soullight.freePassDistance){                                
+                            soullight.aimStart() 
+                        }else{
+                            if(losRc.length == 0){
+                                soullight.passLight();
+                            }else{
+                                soullight.aimStart() 
+                            }
+                        }                        
+                    };
+                    if (control_passRelease && soullight.ownerid == 1) { if(soullight.aimer.started){soullight.aimStop();} };
+
                     //Throw Pulse. Can only do it if you have the soulight
                     if(control_pulsePress && soullight.ownerid == 1){
                         //This needs a solid visual indicator that they players can perform this merge
@@ -389,6 +400,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     return (keyPad.checkKeyState('SPC') == 1);
                 case 'beam':
                     return (keyPad.checkMouseState('MB0') > 0);
+                case 'grab':
+                    return (keyPad.checkKeyState('T') == 1);
                 case 'pass':
                     return (keyPad.checkKeyState('R') == 1);
                 case 'passR':
@@ -463,24 +476,38 @@ class Bright extends Phaser.Physics.Matter.Sprite{
     }
     death(animation, frame){
         
-        if(animation.key == 'bright-walk'){
-            this.setActive(false);
-            this.setVisible(false);
-            this.debug.setVisible(false);
-            this.hp = 1;
+        if(animation.key == 'bright-death'){
+            entrances.getChildren().forEach(e=>{
+                if(e.name == current_exit.bright){
+                    bright.setPosition(e.x,e.y);
+                }
+            });
+            this.hp = 5;
+            hud.setHealth(this.hp,1);
             this.alive = true; 
+            if(soullight.ownerid == 1){
+                soullight.passLight();
+            }
+
+            //If Bright has soullight, it gets tossed to Solana, he goes dark and reappears at entrance.
         }
     }
     receiveDamage(damage) {
-        this.hp -= damage;           
-        
-        // if hp drops below 0 we deactivate this enemy
-        if(this.hp <= 0 && !this.dead ) {
-            this.alive = false; 
-                     
-            this.sprite.on('animationcomplete',this.death,this);            
-            this.sprite.anims.play('bright-walk', false);
-            
+        if(this.alive && !this.invuln){            
+            this.invuln = true;
+            this.setTint(0xFF0000);
+            //invuln timer
+            this.invulnTimer = this.scene.time.addEvent({ delay: 1000, callback: function(){bright.invuln=false;bright.clearTint()}, callbackScope: this, loop: false });
+            this.hp -= damage;           
+            hud.setHealth(this.hp,1);
+            // if hp drops below 0 we deactivate this enemy
+            if(this.hp <= 0 && !this.dead ) {
+                this.alive = false; 
+                        
+                this.sprite.on('animationcomplete',this.death,this);            
+                this.sprite.anims.play('bright-death', false);
+                
+            }
         }
     }
     pulseCharge(object){

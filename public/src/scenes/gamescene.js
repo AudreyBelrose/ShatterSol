@@ -51,15 +51,6 @@ var GameScene = new Phaser.Class({
             world_backgrounds.push(this.add.tileSprite(512, 256, map.widthInPixels*2, map.heightInPixels*2, e));
         });
         
-
-        // tiles for the ground layer
-        // var TilesForest = map.addTilesetImage('32Tileset','tiles32');//called it 32Tileset in tiled
-        // var TilesCastle = map.addTilesetImage('32Castle','castle32');//called it 32Castle in tiled
-        // var TilesCorruption = map.addTilesetImage('32Corruption','corruption32');//called it 32Corruption in tiled
-
-        //Load all the tilesets graphics into an array. This makes it more dynamic. The layers will be consistent. The graphics may not.
-        //var tilesetImages = [TilesForest,TilesCastle,TilesCorruption];
-
         var tilesetImages = [];
         lvlCfg.tsPairs.forEach(e=>{
             tilesetImages.push(map.addTilesetImage(e.tsName,e.tsKey));
@@ -113,21 +104,18 @@ var GameScene = new Phaser.Class({
         // set the boundaries of our game world
         this.matter.world.convertTilemapLayer(this.collisionLayer);
         this.matter.world.setBounds(0,0,map.widthInPixels, map.heightInPixels);
-        //Generate shadow canvas
-        //Shadow Canvas
-        if(this.textures.get("canvasShadow").key != "__MISSING"){  
-            let oldShadow = this.textures.get("canvasShadow");
-            oldShadow.destroy();
-        }
-        shadow_layer = this.textures.createCanvas("canvasShadow", map.widthInPixels, map.heightInPixels);        
-        shadow_context = shadow_layer.getContext();
-        shadow_context.fillRect(0,0,map.widthInPixels, map.heightInPixels); 
-        shadow_layer.refresh();
-
+        
         //Clear Light Polygons
         lightPolygons = [];
+        //Generate shadow canvas
+        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.9);
+        this.shadow_graphic = this.make.graphics();    
+        this.shadow_graphic.setPosition(0,0);        
+        this.shadow_mask = this.shadow_graphic.createGeometryMask();
+        this.shadow_mask.setInvertAlpha();
+        this.shadow_background.setMask(this.shadow_mask);
+
         //Draw Debug
-        
         this.matter.world.createDebugGraphic();
         this.matter.world.drawDebug = false;
         //Add Labels for tile bodies for easier collision management
@@ -151,9 +139,9 @@ var GameScene = new Phaser.Class({
         });
         
         //Raycasting - setup. For troubleshooting ONLY - REmove once no longer needed.
-        lightCanvas = this.add.graphics(0, 0);
-        lightCanvas.setVisible(false);
-        lightCanvas.setAlpha(0.5);
+        // lightCanvas = this.add.graphics(0, 0);
+        // lightCanvas.setVisible(false);
+        // lightCanvas.setAlpha(0.5);
 
         //console.log("Raycasting :",lightCanvas,lightPolygons);
 
@@ -462,14 +450,13 @@ var GameScene = new Phaser.Class({
                 spider = spiders.get(tmxObjRef.x,tmxObjRef.y);
                 spider.setPosition(tmxObjRef.x,tmxObjRef.y);
             }else{
-
                 //Standard Types            
                 if(EnemyClass == 'ground'){
-                    new_enemy = enemies.get(enemylayer.objects[e].x,enemylayer.objects[e].y,EnemyType);
+                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
                 }else if(EnemyClass == 'air'){
-                    new_enemy = enemiesFly.get(enemylayer.objects[e].x,enemylayer.objects[e].y,EnemyType);                
+                    new_enemy = enemiesFly.get(tmxObjRef.x,tmxObjRef.y,EnemyType);                
                 }else{
-                    new_enemy = enemies.get(enemylayer.objects[e].x,enemylayer.objects[e].y,EnemyType);
+                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
                 }
 
                 if(props.path){
@@ -496,7 +483,6 @@ var GameScene = new Phaser.Class({
         }
         //Spawn Objects
         for(e=0;e<objectlayer.objects.length;e++){
-            let mapObject;
             //NOTE: TMX has a really weird setup for object origins: Rectangles are top-left. But other objects, like image objects (windows) are bottom-left
             //This makes things tricky. I need to manually correct for those.
             let x_offset = 0;
@@ -504,9 +490,13 @@ var GameScene = new Phaser.Class({
             let tmxObjRef = objectlayer.objects[e];
             if(tmxObjRef.type == "mirror"){  
                 let mir = mirrors.get();
-                x_offset = mapObject.width/2;
-                y_offset = mapObject.height/2;
-                mir.setup(tmxObjRef.x-x_offset,tmxObjRef.y-y_offset,tmxObjRef.rotation);
+                let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
+                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
+                let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
+                if(tmxObjRef.rotation != 0){      
+                    Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
+                }     
+                mir.setup(centerPoint.x,centerPoint.y,tmxObjRef.rotation);
             }else if(tmxObjRef.type == "window"){  
                 let bar = barriers.get(-1000,-1000,"tmxwindow",0,true);
                 let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
@@ -584,6 +574,10 @@ var GameScene = new Phaser.Class({
                     }
                     shapeObject.setCollisionCategory(CATEGORY.SOLID) 
                     shapeObject.body.label = 'JUNK'; 
+            }else if(tmxObjRef.type == 'water'){
+                let wtprops = getTileProperties(tmxObjRef.properties);
+                let wtOps = {dampening: .0001,tension: 0.01,texture: 'water'};
+                let wt = new TMXWater(this,tmxObjRef.x,tmxObjRef.y,tmxObjRef.width,tmxObjRef.height,tmxObjRef.height,wtOps);
             }
         }
         //Spawn Triggers
@@ -629,7 +623,7 @@ var GameScene = new Phaser.Class({
                     soullight.setPosition(exitObj.x,exitObj.y-32);
                     solana.setLastEntrance(exitObj);
                     this.cameras.main.centerOn(exitObj.x,exitObj.y); 
-                    
+
                 }
                 if(exitObj.name == current_exit.bright){                    
                     bright.setPosition(exitObj.x,exitObj.y-32);
@@ -685,27 +679,10 @@ var GameScene = new Phaser.Class({
             gravityY: 600,
             tint: "#FF0000"
          });
-         //Timer  - Example
-         //spawner = this.time.addEvent({ delay: 5000, callback: this.spawnEnemies, callbackScope: this, loop: true });
-         //timeEventName.remove();spawnEnemies(spawnlayer.objects)
          
          //Pass Energy Regen
          this.energyTimer = this.time.addEvent({ delay: 250, callback: this.generateEnergy, callbackScope: this, loop: true });
-
-      
-        
-         //Lightning construct using preloaded cavnas called canvasShadow (See Preloader)
-        var shadTexture = this.add.image(map.widthInPixels/2, map.heightInPixels/2, 'canvasShadow');
-        shadTexture.alpha = .6;
-        shadTexture.setDepth(DEPTH_LAYERS.FRONT)
-
-        // var light1 = this.add.image(256,64,'light1');
-        // light1.alpha = .5;
-        // light1.tint = 0xCCCC00;
-
-        // solana.z = light1.z+1;
-        // bright.z = light1.z+1;
-
+     
          //Start soulight play
          soullight.sprite.anims.play('soulight-move', true);//Idle
 
@@ -1217,9 +1194,13 @@ var GameScene = new Phaser.Class({
         if(playerMode == 0){
             solana.setController(playerConfig[0].ctrl);
             bright.setController(playerConfig[0].ctrl);
+            hud.brightStatBarHead.setFrame(1);
+            hud.solanaStatBarHead.setFrame(0)
         }else if(playerMode == 1){
             solana.setController(playerConfig[0].ctrl);
             bright.setController(playerConfig[1].ctrl);
+            hud.brightStatBarHead.setFrame(0);
+            hud.solanaStatBarHead.setFrame(0)
 
         }
 
@@ -1251,26 +1232,11 @@ var GameScene = new Phaser.Class({
         //Lights2d
         // solana.setPipeline('Light2D');
         // let light  = this.lights.addLight(0, 0, 200).setScrollFactor(0.0).setIntensity(2);
-
-
-        //test Text Blip
-        //this.testTB = new TextBlips(this,solana.x+32,solana.y-64,"derping",{resolution: 2, fontSize: '22px'},0,1.1,0,6,0,-4);
-
         
     },
     update: function (time, delta)
     {
-        //this.testTB.update();
-
-        //Handle KP "Sticking" bug
-        // if(this.doKPClear){
-        //     if(keyPad != undefined){
-        //         keyPad.clearKeyStates();
-        //     }
-        //     this.doKPClear = false;
-        // }
-        //Update Inputs
-
+       
 
         //center camera on the spot between the players. Zoom out to a max.
         let disPlayers = Phaser.Math.Distance.Between(solana.x,solana.y,bright.x,bright.y);
@@ -1339,73 +1305,34 @@ var GameScene = new Phaser.Class({
         if(tutorialRunning){
             //polaris.update(time,delta);
         };
-
-        //Draw lighting        
-        shadow_context.fillRect(0,0,map.widthInPixels, map.heightInPixels);
-
-        //Save Canvas and then do cuts for SOulight Raycasting
-        shadow_context.save();        
-        shadow_context.globalCompositeOperation='destination-out';    
-        //Cut out line of sight blockers
-        this.cutCanvasRaycastPolygon(soullight.x,soullight.y,soullight.protection_radius.value*5,shadow_context);
-     
-        //Check to see if Solana is in the light
+        //Draw lighting
         var solana_in_light = false;
+        this.shadow_graphic.clear();
+        this.cutGraphicRaycastPolgon(soullight.x,soullight.y,1440);
+        //CENTER ON CAMERA AND CALC FOR ANY APPLICABLE OFFSETS        
+        this.shadow_graphic.fillCircle(bright.x, bright.y, bright.light_radius);
 
-        shadow_context = this.cutCanvasCircle(soullight.x,soullight.y,soullight.protection_radius.value,shadow_context);
-
-
-        if(tutorialRunning){
-            //shadow_context = this.cutCanvasCircle(polaris.x,polaris.y,128,shadow_context);
-        }
+        //Solana in Soullight Range?
         if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) <= soullight.protection_radius.value){
-            
             //Can the light reach her without being blocked?
             let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:soullight.x,y:soullight.y});
             if(losRc.length == 0){solana_in_light = true;};
-
-        }
-        
-
-        //Restore Canvas
-        shadow_context.restore();
-
-        //Trim out Bright default radius if in Dark Mode
-        if(soullight.ownerid == 0){
-            shadow_context.save(); 
-            shadow_context.globalCompositeOperation='destination-out';
-            shadow_context = this.cutCanvasCircle(bright.x,bright.y,bright.light_radius,shadow_context);
-            shadow_context.restore();
         }
         if(Phaser.Math.Distance.Between(bright.x,bright.y,solana.x,solana.y) <= bright.light_radius){solana_in_light = true;}
 
-        //Do Crystal Lamps and Light Checking
         let lamps = crystallamps.getChildren()
         for(var x = 0;x < lamps.length;x++){
             var lamp = lamps[x];
-            //LAMPS PERMANANTLY LIGHT AREA
-            shadow_context.save(); 
-            shadow_context.globalCompositeOperation='destination-out';
-            shadow_context = this.cutCanvasCircle(lamp.x,lamp.y,lamp.brightness,shadow_context);
-            shadow_context.restore();
-
-            //Check if solana is inside at least one light, if not, flag them and damage them every x seconds.
+            this.shadow_graphic.fillCircle(lamp.x, lamp.y, lamp.brightness);
             if(Phaser.Math.Distance.Between(lamp.x,lamp.y,solana.x,solana.y) <= lamp.brightness){solana_in_light = true;}
-
         }
-        //Cut out SolBombs for light 
         let sbs = solbombs.getChildren();
         for(let s=0;s<sbs.length;s++){
             let sb = sbs[s];
-            shadow_context.save(); 
-            shadow_context.globalCompositeOperation='destination-out';
-            shadow_context = this.cutCanvasCircle(sb.x,sb.y,sb.lightRadius,shadow_context);
-            shadow_context.restore();
-            if(Phaser.Math.Distance.Between(sb.x,sb.y,solana.x,solana.y) <= sb.lightRadius){solana_in_light = true;}
-        }       
+            this.shadow_graphic.fillCircle(sb.x, sb.y, sb.light_radius);
+            if(Phaser.Math.Distance.Between(sb.x,sb.y,solana.x,solana.y) <= sb.light_radius){solana_in_light = true;}
+        }
 
-        shadow_layer.refresh();
-        //FIX: //Raycast with max range instead of circle radius for soulight. That way, she only gets protected if she is in the light
 
         //Instead of doing damage right away, do drain energy. IF totally drained, then take damage.
         solana.inLight = solana_in_light;
@@ -1415,13 +1342,10 @@ var GameScene = new Phaser.Class({
             if(hud.solanaStatBar.getValue() <= 0){solana.receiveDamage(1);};
         };
 
-        //Update Light Source
-        moveLightSource(soullight.sprite.x,soullight.sprite.y);
-
         //KEYPRESS DETECTION - USING CUSTOM CONTROLLER CLASS
         //Suicide to test animation
         if(keyPad.checkKeyState('P') == 1){            
-            solana.receiveDamage(1);
+            bright.receiveDamage(1);
         }
         
         //GLOBAL DEBUG TURN ON/OFF
@@ -1498,9 +1422,13 @@ var GameScene = new Phaser.Class({
                 curr_player=players.BRIGHT;
                 if(bright.light_status == 0){bright.reAlignBright();}            
                 //this.cameras.main.startFollow(bright.sprite,true,.1,.1,0,0); 
+                hud.brightStatBarHead.setFrame(0);
+                hud.solanaStatBarHead.setFrame(1)
             }else{
                 curr_player=players.SOLANA;
                 //this.cameras.main.startFollow(solana.sprite,true,.1,.1,0,0);
+                hud.brightStatBarHead.setFrame(1);
+                hud.solanaStatBarHead.setFrame(0)
             }
         }
         
@@ -1521,6 +1449,29 @@ var GameScene = new Phaser.Class({
             let cam_p2 = this.cameras.getCamera('cam_p2');
             this.cameras.remove(cam_p1);
             this.cameras.remove(cam_p2);
+        }
+    },
+    cutGraphicRaycastPolgon(x,y,range){
+        let shapes = [];
+        lightPolygons.forEach(function(e){
+            let d = Phaser.Math.Distance.Between(x,y,e[0][0],e[0][1]);
+            if(d < range){
+                shapes.push(e);            
+            }
+        });	
+
+        let soullight_border_verts = soullight.protection_circle.getPoints(24);
+        shapes.push(createLightObstaclePolygon(0,0,soullight_border_verts));
+
+        var visibility = createLightPolygon(x, y, shapes);
+        if(visibility){
+            this.shadow_graphic.beginPath();
+            this.shadow_graphic.moveTo(visibility[0][0], visibility[0][1]);
+            for (var i = 1; i <= visibility.length; i++) {
+                this.shadow_graphic.lineTo(visibility[i % visibility.length][0], visibility[i % visibility.length][1]);
+            }
+            this.shadow_graphic.fillPath();
+            this.shadow_graphic.closePath();
         }
     },
     cutCanvasRaycastPolygon(x,y,range,ctx){
@@ -1552,54 +1503,13 @@ var GameScene = new Phaser.Class({
 
         return ctx;
     },
-	updateShadowTexture: function() {
-        // This function updates the shadow texture (this.shadowTexture).
-        // First, it fills the entire texture with a dark shadow color.
-        // Then it draws a white circle centered on the pointer position.
-        // Because the texture is drawn to the screen using the MULTIPLY
-        // blend mode, the dark areas of the texture make all of the colors
-        // underneath it darker, while the white area is unaffected.
-    
-        // Draw shadow
-        this.shadowTexture.context.fillStyle = 'rgb(100, 100, 100)';
-        this.shadowTexture.context.fillRect(0, 0, this.game.width, this.game.height);
-    
-        // Draw circle of light
-        this.shadowTexture.context.beginPath();
-        this.shadowTexture.context.fillStyle = 'rgb(255, 255, 255)';
-        this.shadowTexture.context.arc(this.game.input.activePointer.x, this.game.input.activePointer.y,
-            this.LIGHT_RADIUS, 0, Math.PI*2);
-        this.shadowTexture.context.fill();
-    
-        // This just tells the engine it should update the texture cache
-        this.shadowTexture.dirty = true;
-    },
     doBack: function ()
-    {
-        
+    {        
 		this.scene.start('mainmenu');
     },
     generateEnergy(){
         hud.alterEnergySolana(2);
         hud.alterEnergyBright(2);
-    },
-    spawnEnemies(){
-        console.log("timer spawner!");
-        if(spawnlayer){
-            var spawns = spawnlayer.objects;
-            if(enemies.countActive() < 10){
-                //Spawn a new enemy every 1 seconds at a random spawner
-                var value = Phaser.Math.Between(0, spawns.length-1);
-                new_enemy = enemies.get();
-                if(new_enemy){
-                    //Setup Enemy
-                    new_enemy.setActive(true);
-                    new_enemy.setVisible(true);
-                    new_enemy.setPosition(spawns[value].x,spawns[value].y);
-                    
-                } 
-            }
-        }   
     },
     saveData(){
         //Save Polaris Data
@@ -1672,35 +1582,6 @@ function createLightObstaclePolygon(x,y,points){
     });
     return shape;
 }
-function moveLightSource(x,y) {
-    // when the mouse is moved, we determine the new visibility polygon 
-    let shapes = [];
-    lightPolygons.forEach(function(e){
-        //This does not take the center in account, just the upper left point, or starting vertex. I may
-        //need a custom object here with the center point.
-        let d = Phaser.Math.Distance.Between(x,y,e[0][0],e[0][1]);
-        if(d < 256){
-            shapes.push(e);            
-        }
-    });	
-    shapes.push(createLightObstacleRect(x-256,y-256,x+512,y+512));
-
-    var visibility = createLightPolygon(x, y, shapes);
-    if(visibility){
-        // then we draw it
-        lightCanvas.clear();
-        lightCanvas.lineStyle(2, 0xff8800, 1);
-        lightCanvas.fillStyle(0xffff00,1);
-        lightCanvas.beginPath();
-        lightCanvas.moveTo(visibility[0][0], visibility[0][1]);
-        for (var i = 1; i <= visibility.length; i++) {
-            lightCanvas.lineTo(visibility[i % visibility.length][0], visibility[i % visibility.length][1]);
-        }
-        lightCanvas.closePath();
-        lightCanvas.fillPath();
-    }
-}
-
 // and this is how the library generates the visibility polygon starting
 // from an array of polygons and a source point
 function createLightPolygon(x, y, polyset) {
@@ -1717,22 +1598,25 @@ function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
     triggerGroup.children.each(function(trigger) {
         //console.log(triggerGroupName,trigger.target);
         if(trigger.target.name){
-            if(trigger.target.type == "gate"){
-                //Search all gets
-                gates.children.each(function(gate) {
-                    //console.log("Trigger had gate target, searching names");
-                    if(gate.name == trigger.target.name){
-                        trigger.setTarget(gate);
-                    }
-                },trigger);
-            }else if(trigger.target.type == "zone"){
-                triggerzones.children.each(function(zone) {
-                    //console.log("Trigger had gate target, searching names");
-                    if(zone.name == trigger.target.name){
-                        trigger.setTarget(zone);
-                    }
-                },trigger);
-            }
+            let nameList = trigger.target.name.split(",");//Comma delimited listing of target names
+            nameList.forEach(name=>{
+                if(trigger.target.type == "gate"){
+                    //Search all gets
+                    gates.children.each(function(gate) {
+                        //console.log("Trigger had gate target, searching names");
+                        if(gate.name == name){
+                            trigger.setTarget(gate);
+                        }
+                    },trigger);
+                }else if(trigger.target.type == "zone"){
+                    triggerzones.children.each(function(zone) {
+                        //console.log("Trigger had gate target, searching names");
+                        if(zone.name == name){
+                            trigger.setTarget(zone);
+                        }
+                    },trigger);
+                }
+            })
 
         }
     }, this);
@@ -1930,6 +1814,12 @@ function createAnimations(scene){
         frames: scene.anims.generateFrameNumbers('bright', { start: 1, end: 1 }),
         frameRate: 2,
         repeat: -1
+    });
+    scene.anims.create({
+        key: 'bright-death',
+        frames: scene.anims.generateFrameNumbers('bright', { frames:[5,6,7,8,9,10,11] }),
+        frameRate: 4,
+        repeat: 0
     });
     scene.anims.create({
         key: 'bright-pulse',
