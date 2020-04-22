@@ -10,10 +10,10 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         
         const { width: w, height: h } = this.sprite;      
-        const mainBody = Bodies.rectangle(0, 0, w * 0.2, h*.65, { chamfer: { radius: 5 } });
+        const mainBody = Bodies.rectangle(0, 0, w * 0.2, h*.50, { chamfer: { radius: 2 } });//WAs .65 for H
         this.sensors = {
-          top: Bodies.rectangle(0, -h*0.35, w * 0.15, 2, { isSensor: true, friction: 0.0 }),
-          bottom: Bodies.rectangle(0, h*0.35, w * 0.15, 2, { isSensor: true, friction: 0.0 }),
+          top: Bodies.rectangle(0, -h*0.28, w * 0.15, 2, { isSensor: true, friction: 0.0 }), //Was .35 for H
+          bottom: Bodies.rectangle(0, h*0.28, w * 0.15, 2, { isSensor: true, friction: 0.0 }),//Was .35 for H
           left: Bodies.rectangle(-w * 0.11, 0, 2, h * 0.45, { isSensor: true, friction: 0.0 }),
           right: Bodies.rectangle(w * 0.11, 0, 2, h * 0.45, { isSensor: true, friction: 0.0 })
         };
@@ -22,7 +22,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.sensors.left.label = "SOLANA_LEFT";
         this.sensors.right.label = "SOLANA_RIGHT";
         this.touching = {up:0,down:0,left:0,right:0};
-
+        
         const compoundBody = Body.create({
           parts: [mainBody, this.sensors.top, this.sensors.bottom, this.sensors.left, this.sensors.right],
           frictionStatic: 0.0,
@@ -31,6 +31,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
           restitution: 0.0,
           density: 0.01 //0.01
         });
+        this.setScale(0.80);
        //Fix the draw offsets for the compound sprite.
         compoundBody.render.sprite.xOffset = .51;
         compoundBody.render.sprite.yOffset = .65;
@@ -613,6 +614,17 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             }
         }   
     }
+    receiveHealth(health){
+       this.hp+=health;
+       if(this.hp > this.max_hp){
+           this.hp = 5;
+           for(let i=0;i < Phaser.Math.Between(1,3);i++){
+                let ls = light_shards.get();
+                ls.spawn(this.x,this.y,300,solana);
+            }
+        };
+       hud.setHealth(this.hp,0);
+    }
     disableInvuln(){
         this.invuln = false;
         this.clearTint();
@@ -828,3 +840,64 @@ class SolBomb extends Phaser.Physics.Matter.Sprite{
         }
     }
 }
+
+//Health
+class Heart extends Phaser.Physics.Matter.Sprite{
+    constructor(scene,x,y) {
+        super(scene.matter.world, x, y, 'health_blip', 0)
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+        this.setActive(true);
+
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        const mainBody =  Bodies.rectangle(x,y,w,h);
+
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0,
+            frictionAir: 0.00,
+            friction: 0.8,//Was 0.1
+            restitution: 0.3,
+            label: 'HEART'
+        });
+ 
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setCollidesWith([ CATEGORY.BRIGHT, CATEGORY.SOLANA, CATEGORY.GROUND, CATEGORY.SOLID])
+        .setPosition(x, y+h*0.20) 
+        this.isReady = false;
+
+        this.readyTimer = this.scene.time.addEvent({ delay: 1000, callback: function(){this.isReady = true;}, callbackScope: this, loop: false });
+
+        this.scene.matterCollision.addOnCollideActive({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                    gameObjectA.collect(gameObjectB)
+                }
+            }
+        });
+    }
+    setup(x,y, properties,name){
+        this.setActive(true); 
+        this.setPosition(x,y);
+        this.name = name;
+ 
+    }
+    update(time, delta)
+    {       
+
+
+    }
+    collect(obj){
+        if(this.isReady){
+            obj.receiveHealth(1);
+            this.destroy();
+        }
+    }
+};

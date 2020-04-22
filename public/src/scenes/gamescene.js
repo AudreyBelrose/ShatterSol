@@ -44,7 +44,7 @@ var GameScene = new Phaser.Class({
         mapTileSize.th = map.tileHeight;
         //Get the lvl config from config.js object
         let lvlCfg = getLevelConfigByName(current_map);
-        console.log(current_map,lvlCfg)
+        console.log(this.matter.world)
         //console.log(map);
         //Create Background - This will need to be custom based on the map.
         lvlCfg.backgrounds.forEach(e=>{
@@ -73,9 +73,7 @@ var GameScene = new Phaser.Class({
         secretTiles = this.add.group({classType:SecretTile, runChildUpdate:true});
         fghiddenlayer.forEachTile(function (tile) {
             if(tile.index != -1){
-                //console.log(tile);
-                let newImgIndex = tile.index - tile.tileset.firstgid;
-                let secretTile = new SecretTile(this,tile.pixelX+tile.width/2,tile.pixelY+tile.height/2,tile.tileset.image.key,newImgIndex).setOrigin(0.5).setDepth(DEPTH_LAYERS.FG);
+                let secretTile = new SecretTile(this,tile.pixelX+tile.width/2,tile.pixelY+tile.height/2,tile.tileset.image.key,tile.index-tile.tileset.firstgid).setOrigin(0.5).setDepth(DEPTH_LAYERS.FG);
                 secretTiles.add(secretTile);
             }
         },this);
@@ -84,9 +82,7 @@ var GameScene = new Phaser.Class({
         if(fgbreakablelayer){
             fgbreakablelayer.forEachTile(function (tile) {
                 if(tile.index != -1){
-                    //console.log(tile);
-                    let newImgIndex = tile.index - tile.tileset.firstgid;
-                    let breakTile = new BreakableTile(this,tile.pixelX+tile.width/2,tile.pixelY+tile.height/2,tile.tileset.image.key,newImgIndex).setOrigin(0.5).setDepth(DEPTH_LAYERS.FG);
+                    let breakTile = new BreakableTile(this,tile.pixelX+tile.width/2,tile.pixelY+tile.height/2,tile.tileset.image.key,tile.index-tile.tileset.firstgid).setOrigin(0.5).setDepth(DEPTH_LAYERS.FG);
                 }
             },this);
             fgbreakablelayer.destroy();
@@ -108,7 +104,7 @@ var GameScene = new Phaser.Class({
         //Clear Light Polygons
         lightPolygons = [];
         //Generate shadow canvas
-        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.9);
+        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.7);
         this.shadow_graphic = this.make.graphics();    
         this.shadow_graphic.setPosition(0,0);        
         this.shadow_mask = this.shadow_graphic.createGeometryMask();
@@ -117,7 +113,9 @@ var GameScene = new Phaser.Class({
 
         //Draw Debug
         this.matter.world.createDebugGraphic();
-        this.matter.world.drawDebug = false;
+        this.matter.world.drawDebug = false;        
+        this.worldGrid = this.add.grid(0,0,map.widthInPixels*2,map.heightInPixels*2,16,16,0x333333,0.1,0x000000,0.8).setOrigin(0);
+        this.worldGrid.setVisible(false);
         //Add Labels for tile bodies for easier collision management
         this.collisionLayer.forEachTile(function (tile) {
             // In Tiled, the platform tiles have been given a "type" property which is a string
@@ -194,6 +192,7 @@ var GameScene = new Phaser.Class({
             shapeObject.setStatic(true);
             shapeObject.setCollisionCategory(CATEGORY.GROUND) 
             shapeObject.body.label = 'GROUND'; 
+            shapeObject.body.friction = 0.01;
             //console.log("Poly Object",shapeObject);
             //Need to add light blocking polygon check here.
             hulls.push(shapeObject);
@@ -517,7 +516,14 @@ var GameScene = new Phaser.Class({
                 x_offset = tmxObjRef.width/2;
                 y_offset = tmxObjRef.height/2;
                 //let newFallPlat = new Fallplat(this,tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-1);
-                platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-1);
+                let oG = -1;
+                map.tilesets.forEach(e=>{
+                    if(e.image.key == 'tiles32'){
+                        oG = e.firstgid;
+                    }
+                })
+                platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-oG);
+                
 
             }else if(tmxObjRef.type == "breakabletile"){  
                 //Changed this to layer object. I may still want this, so leave it in for now. 3/14/2020 - BNB
@@ -578,6 +584,9 @@ var GameScene = new Phaser.Class({
                 let wtprops = getTileProperties(tmxObjRef.properties);
                 let wtOps = {dampening: .0001,tension: 0.01,texture: 'water'};
                 let wt = new TMXWater(this,tmxObjRef.x,tmxObjRef.y,tmxObjRef.width,tmxObjRef.height,tmxObjRef.height,wtOps);
+            }else if(tmxObjRef.type == 'chest'){
+                let chestProps = getTileProperties(tmxObjRef.properties);
+                let chest = new Chest(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
             }
         }
         //Spawn Triggers
@@ -623,7 +632,6 @@ var GameScene = new Phaser.Class({
                     soullight.setPosition(exitObj.x,exitObj.y-32);
                     solana.setLastEntrance(exitObj);
                     this.cameras.main.centerOn(exitObj.x,exitObj.y); 
-
                 }
                 if(exitObj.name == current_exit.bright){                    
                     bright.setPosition(exitObj.x,exitObj.y-32);
@@ -1003,8 +1011,9 @@ var GameScene = new Phaser.Class({
                         }
                     }  
                 }
-                //Between Fallplat and Solana
-                if ((bodyA.label === 'FALLPLAT' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'FALLPLAT')) {
+                //Between Fallplat and Solana and Bright
+                let fallplatHitList = ['SOLANA','BRIGHT'];
+                if ((bodyA.label === 'FALLPLAT' && fallplatHitList.includes(bodyB.label)) || (fallplatHitList.includes(bodyA.label) && bodyB.label === 'FALLPLAT')) {
                     //Get Bullet Object and run hit function
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'FALLPLAT');
                     if (gObjs[0].active && gObjs[0].y > gObjs[1].y){
@@ -1012,7 +1021,7 @@ var GameScene = new Phaser.Class({
                     }  
                 }
                 //Between Fallplat and ANYTHING ELSE
-                if ((bodyA.label === 'FALLPLAT' && bodyB.label !== 'SOLANA') || (bodyA.label !== 'SOLANA' && bodyB.label === 'FALLPLAT')) {
+                if ((bodyA.label === 'FALLPLAT' && !fallplatHitList.includes(bodyB.label)) || (!fallplatHitList.includes(bodyA.label) && bodyB.label === 'FALLPLAT')) {
                     //Get Bullet Object and run hit function
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'FALLPLAT');
                     //if (gObjs[0].ready == false && gObjs[0].y < gObjs[1].tile.pixelY){
@@ -1232,6 +1241,7 @@ var GameScene = new Phaser.Class({
         //Lights2d
         // solana.setPipeline('Light2D');
         // let light  = this.lights.addLight(0, 0, 200).setScrollFactor(0.0).setIntensity(2);
+        this.debugDrag = [];
         
     },
     update: function (time, delta)
@@ -1373,16 +1383,48 @@ var GameScene = new Phaser.Class({
             //this.matter.world.engine.world.bodies
             let bodiesClicked = Phaser.Physics.Matter.Matter.Query.point(this.matter.world.localWorld.bodies, {x:pointer.worldX, y:pointer.worldY});
             console.log(bodiesClicked);
-            // bodiesClicked.forEach(e=>{
-            //     if(e.label == 'CRATE'){
-            //         e.gameObject.clicked();
-            //     }
-            // });
+            bodiesClicked.forEach(e=>{
+                this.debugDrag.push(e);
+            });
+            this.worldGrid.setVisible(true);
+        }else if(keyPad.checkMouseState('MB2') > 1){
+            if(keyPad.checkKeyState('SHIFT') >= 1){
+                let vertChange = (pointer.position.y-pointer.prevPosition.y);
+                this.debugDrag.forEach(e=>{
+                    if(e.gameObject != undefined){e.gameObject.angle+=Math.round(vertChange/2);};
+                })
+            }else{
+                let posX = pointer.worldX;
+                let posY = pointer.worldY;
+                let gridLock = (keyPad.checkKeyState('CTRL') >= 1);
+                if(gridLock){
+                    posX = Math.round(posX/16)*16;
+                    posY = Math.round(posY/16)*16;
+                }
+                this.debugDrag.forEach(e=>{
+                    if(e.gameObject != undefined){
+                        let xO = (Math.floor(e.gameObject.width/16) % 2) * -8;
+                        let yO = (Math.floor(e.gameObject.height/16) % 2) * -8;
+                        e.gameObject.setPosition(posX+xO,posY+yO);
+                    };
+                })
+            }
         }else if(keyPad.checkMouseState('MB2') == -1){
-            // let c = crates.getChildren();
-            // c.forEach(e=>{                
-            //     e.released();                
-            // });
+            this.debugDrag.forEach(e=>{
+                if(e.gameObject != undefined){
+                    let debugObj = {
+                        class: e.gameObject.constructor.name,
+                        angle: e.gameObject.angle,
+                        bounds: {
+                            min: {x:e.bounds.min.x.toFixed(2),y:e.bounds.min.y.toFixed(2)},
+                            max: {x:e.bounds.max.x.toFixed(2),y:e.bounds.max.y.toFixed(2)},
+                        }
+                    }
+                    console.log(debugObj);
+                };
+            })
+            this.debugDrag = [];
+            this.worldGrid.setVisible(false);
         }
          
         
@@ -1559,7 +1601,9 @@ var GameScene = new Phaser.Class({
     }
     
 });
+//************************************************//
 //External Functions
+//************************************************//
 function playPause(){
     //console.log('Pause',keyPad, solana.getControllerAction('right'),keyPad.checkKeyState('D'));
 
@@ -1568,6 +1612,10 @@ function playResume(){
     //console.log('Resume',keyPad, solana.getControllerAction('right'),keyPad.checkKeyState('D'));
     //Setup keypad clear on next update
     //playScene.clearKeypad();    
+}
+function distanceBetweenObjects(a,b){
+    //returns distance between two game objects
+    return Phaser.Math.Distance.Between(a.x,a.y,b.x,b.y);
 }
 function getObjectTilePosition(x,y,ts){
     return {x: Math.floor(x/ts),y: Math.floor(y/ts)};
@@ -1597,7 +1645,7 @@ function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
     //Currently restricted to types. I need to expand this
     triggerGroup.children.each(function(trigger) {
         //console.log(triggerGroupName,trigger.target);
-        if(trigger.target.name){
+        if(trigger.target.name != -1 && trigger.target.name != undefined){
             let nameList = trigger.target.name.split(",");//Comma delimited listing of target names
             nameList.forEach(name=>{
                 if(trigger.target.type == "gate"){
@@ -1613,6 +1661,13 @@ function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
                         //console.log("Trigger had gate target, searching names");
                         if(zone.name == name){
                             trigger.setTarget(zone);
+                        }
+                    },trigger);
+                }else if(trigger.target.type == "platform"){
+                    platforms.children.each(function(platform) {
+                        //console.log("Trigger had gate target, searching names");
+                        if(platform.name == name){
+                            trigger.setTarget(platform);
                         }
                     },trigger);
                 }
@@ -2069,12 +2124,17 @@ function createAnimations(scene){
         frames: scene.anims.generateFrameNumbers('telebeam', { frames:[0,1,2] }),
         frameRate: 12,
         repeat: -1
-    }); 
-     
+    });      
     scene.anims.create({
         key: 'light-shield',
         frames: scene.anims.generateFrameNumbers('solana_shield', { frames:[0,1,2,1,0] }),
         frameRate: 12,
         repeat: -1
+    });       
+    scene.anims.create({
+        key: 'chest-open',
+        frames: scene.anims.generateFrameNumbers('chest', { frames:[0,1,2] }),
+        frameRate: 4,
+        repeat: 0
     }); 
 }
