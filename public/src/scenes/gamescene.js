@@ -136,35 +136,15 @@ var GameScene = new Phaser.Class({
             //}
         });
         
-        //Raycasting - setup. For troubleshooting ONLY - REmove once no longer needed.
-        // lightCanvas = this.add.graphics(0, 0);
-        // lightCanvas.setVisible(false);
-        // lightCanvas.setAlpha(0.5);
-
-        //console.log("Raycasting :",lightCanvas,lightPolygons);
-
-
-        //NEED TO TEST THIS OUT WITH JUMP CODE. I NEED TO CREATE A TRUE GAME OBJECT HERE, SO I CAN REFERENCE THE TYPE.
-        //NOT ABSOLUTELY NEEDED, BUT PROBABLY BETTER.
 
         //Test Hulls Layer for Object Creation for collision. Very Effecient.
         //See http://labs.phaser.io/edit.html?src=src/game%20objects/tilemap/collision/matter%20ghost%20collisions.js
-        // let rectCarve = map.findObject('hulls', function (obj) { return obj.name === 'hull'; });
-        // let rectHull = this.matter.add.rectangle(
-        //     rectCarve.x + (rectCarve.width / 2), rectCarve.y + (rectCarve.height / 2),
-        //     rectCarve.width, rectCarve.height,
-        //     { isStatic: true }
-        // );
-        
-        // rectHull.label = 'GROUND';
-        // rectHull.collisionFilter.category = CATEGORY.GROUND;
-        // rectHull.friction = .9;
-
-        // console.log("RectHull",rectHull,rectCarve)
+ 
         
         let hullsLayer = map.getObjectLayer('hulls');
         hulls = [];
         hullsLayer.objects.forEach(e=>{
+            let hullprops = getTileProperties(e.properties);
             //console.log(e);
             let newBody = null;
             let shapeObject = null;
@@ -192,9 +172,9 @@ var GameScene = new Phaser.Class({
             shapeObject.setStatic(true);
             shapeObject.setCollisionCategory(CATEGORY.GROUND) 
             shapeObject.body.label = 'GROUND'; 
-            shapeObject.body.friction = 0.01;
-            //console.log("Poly Object",shapeObject);
-            //Need to add light blocking polygon check here.
+            //Make the friction come from a property setter. Default to 0.01.
+            
+            shapeObject.body.friction = hullprops != undefined? (hullprops.friction != undefined ? hullprops.friction : 0.01 ) : 0.01;
             hulls.push(shapeObject);
             losBlockers.push(shapeObject.body);
         });
@@ -522,7 +502,13 @@ var GameScene = new Phaser.Class({
                         oG = e.firstgid;
                     }
                 })
-                platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-oG);
+                let platfallprops = getTileProperties(tmxObjRef.properties);
+                let pf = platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-oG);
+                if(platfallprops != undefined){
+                    if(platfallprops.shakeTime != undefined && platfallprops.shakeCount != undefined){
+                        pf.setShakeTime(platfallprops.shakeTime,platfallprops.shakeCount);
+                    }
+                }
                 
 
             }else if(tmxObjRef.type == "breakabletile"){  
@@ -587,6 +573,26 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == 'chest'){
                 let chestProps = getTileProperties(tmxObjRef.properties);
                 let chest = new Chest(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+            }else if(tmxObjRef.type == 'line'){
+                console.log(tmxObjRef);
+                let g_sp1 = this.add.graphics();
+                g_sp1.setPosition(tmxObjRef.x,tmxObjRef.y);
+                g_sp1.lineStyle(2, 0xFF00FF, 1.0);
+                // let spl = new Phaser.Curves.Spline(tmxObjRef.polyline);
+                // spl.draw(g_sp1);
+                let polyPath =  new Phaser.Curves.Path();
+                tmxObjRef.polyline.forEach((e,i)=>{
+                    if(i==0){
+                        polyPath.moveTo(e);
+                    }else{
+                        polyPath.lineTo(e);
+                    };
+                });
+                polyPath.draw(g_sp1);
+            }else if(tmxObjRef.type == 'minecart'){
+                let cart = new Vehicle(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2).setDepth(DEPTH_LAYERS.FRONT);
+                cart.wA.setDepth(DEPTH_LAYERS.FRONT);
+                cart.wB.setDepth(DEPTH_LAYERS.FRONT);
             }
         }
         //Spawn Triggers
@@ -779,6 +785,7 @@ var GameScene = new Phaser.Class({
               if (gameObjectB !== undefined &&
                 (gameObjectB instanceof TMXPlatform
                       || gameObjectB instanceof Barrier
+                      || gameObjectB instanceof Vehicle
                       || gameObjectB instanceof TMXGate
                       || gameObjectB instanceof TMXPlate
                       || gameObjectB instanceof Fallplat
@@ -855,6 +862,7 @@ var GameScene = new Phaser.Class({
               if (gameObjectB !== undefined &&
                 (gameObjectB instanceof TMXPlatform
                 || gameObjectB instanceof Barrier
+                || gameObjectB instanceof Vehicle
                 || gameObjectB instanceof TMXGate
                 || gameObjectB instanceof TMXPlate
                 || gameObjectB instanceof Fallplat
@@ -903,6 +911,9 @@ var GameScene = new Phaser.Class({
             callback: eventData => {
               const { bodyB, gameObjectB, bodyA, gameObjectA } = eventData;
 
+              let control_up = bright.ctrlDeviceId >= 0? gamePad[bright.ctrlDeviceId].checkButtonState('up') > 0 : keyPad.checkKeyState('W') > 0;
+              let control_down = bright.ctrlDeviceId >= 0? gamePad[bright.ctrlDeviceId].checkButtonState('down') > 0 : keyPad.checkKeyState('S') > 0;
+
                 if (gameObjectB !== undefined && gameObjectB instanceof TMXPlate) {
                     if (gameObjectA.light_status == 1) {//Only in Dark Mode
                         gameObjectB.usePlate();
@@ -910,8 +921,19 @@ var GameScene = new Phaser.Class({
                 }
 
                 if (gameObjectB !== undefined && gameObjectB instanceof TMXZone) {
-                    gameObjectB.enterZone(bright,1);
+                    gameObjectB.inZone(bright,1);
                 } 
+
+                if (gameObjectB !== undefined && gameObjectB instanceof MirrorSensor) {
+                    if(curr_player==players.BRIGHT){
+                        //Only control if currently the active control object
+                        if(control_up) {
+                            gameObjectB.parent.rotateMirror(2);
+                        }else if(control_down) {
+                            gameObjectB.parent.rotateMirror(-2);
+                        }
+                    }
+                }
             }
         });
         this.matterCollision.addOnCollideActive({
@@ -964,7 +986,7 @@ var GameScene = new Phaser.Class({
               }
               //Solana Enters a zone trigger
               if (gameObjectB !== undefined && gameObjectB instanceof TMXZone) {
-                    gameObjectB.enterZone(solana,0);
+                    gameObjectB.inZone(solana,0);
               }
 
               if (gameObjectB !== undefined && gameObjectB instanceof NPCSensor) {
@@ -1089,14 +1111,14 @@ var GameScene = new Phaser.Class({
                 //Between Soulight and Solana
                 if ((bodyA.label === 'SOULLIGHT' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'SOULLIGHT')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULLIGHT');
-                    if (gObjs[0].active){
+                    if (gObjs[0].active && gObjs[0].ownerid != 0){
                         gObjs[0].lockLight(gObjs[1],0);
                     }  
                 }
                 //Between Soulight and Bright
                 if ((bodyA.label === 'SOULLIGHT' && bodyB.label === 'BRIGHT') || (bodyA.label === 'BRIGHT' && bodyB.label === 'SOULLIGHT')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULLIGHT');
-                    if (gObjs[0].active){
+                    if (gObjs[0].active && gObjs[0].ownerid != 1){
                         gObjs[0].lockLight(gObjs[1],1);
                     }  
                 }
@@ -1242,7 +1264,7 @@ var GameScene = new Phaser.Class({
         // solana.setPipeline('Light2D');
         // let light  = this.lights.addLight(0, 0, 200).setScrollFactor(0.0).setIntensity(2);
         this.debugDrag = [];
-        
+
     },
     update: function (time, delta)
     {
