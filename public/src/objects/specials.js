@@ -184,6 +184,8 @@ class Rock extends Phaser.Physics.Matter.Sprite{
         //Crush Timer
         this.readyCrush = false;
         this.crushTimer = this.scene.time.addEvent({ delay: 300, callback: this.setReadyCrush, callbackScope: this, loop: false });
+        //Add it so rocks an only collide with ground,solid and dark for a few ms. should allow me to use them as an effect.
+        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK]);
     }
     update(time, delta)
     {       
@@ -194,6 +196,7 @@ class Rock extends Phaser.Physics.Matter.Sprite{
     }
     setReadyCrush(){
         this.readyCrush = true;
+        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK,CATEGORY.SOLANA,CATEGORY.VEHICLE]);
     }
     impact(obj){
         if(this.readyCrush){
@@ -204,13 +207,13 @@ class Rock extends Phaser.Physics.Matter.Sprite{
             if(force >= 2){                
                 //console.log("Rock Impact", force >> 0,speed >> 0,fromBody.density);
                 if(Phaser.Math.Between(1,5) == 1){ //20%
-                    if(this.scale > .25){
+                    if(this.scale > 0.25){
                         for(let r=0;r< Phaser.Math.Between(1,3);r++){
                             let newRock = rocks.get();
                             newRock.setup(this.x,this.y,this.scale*.75);                        
                         }
-                    }
-                    this.getShards();
+                        this.getShards();
+                    }                   
                     this.destroy();
                 }else{
                     this.getShards();
@@ -259,6 +262,8 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
         this.ready = true;
         this.dead = false;
         this.spawnPos = {x:x,y:y};
+        this.shakeCount = 3;
+        this.shakeTime = 150; // Shakes 3 times at 150ms each
         
     }
     setup(x,y){
@@ -267,6 +272,10 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
         this.spawnPos.x = x;
         this.spawnPos.y = y;
 
+    }
+    setShakeTime(ms,ct){
+        this.shakeTime = ms;
+        this.shakeCount = ct;
     }
     reset(){
         this.setActive(true);
@@ -311,8 +320,8 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
                 x: this.x+1,               // '+=100'
                 y: this.y+1,               // '+=100'
                 ease: 'Bounce.InOut',       // 'Cubic', 'Elastic', 'Bounce', 'Back'
-                duration: 150,
-                repeat: 3,            // -1: infinity
+                duration: this.shakeTime,
+                repeat: this.shakeCount,            // -1: infinity
                 yoyo: true,
                 onComplete: this.openComplete,
                 onCompleteParams: [this],
@@ -388,6 +397,15 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
     setReadyCrush(){
         this.readyCrush = true;
     }
+    doCrush(){
+        for(let r=0;r< Phaser.Math.Between(0,3);r++){
+            let newRock = rocks.get();
+            newRock.setup(this.x,this.y,0.25);  
+            newRock.applyForce({x:Phaser.Math.FloatBetween(-0.0010,0.0010),y:Phaser.Math.FloatBetween(0.0,-0.0010)});                     
+        }
+        this.detailSprite.destroy();
+        this.destroy();
+    }
     impact(obj){
         if(this.readyCrush){
             this.readyCrush = false;
@@ -402,8 +420,7 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
             // var bodyBMomentum = Phaser.Physics.Matter.Matter.Vector.mult({x:0,y:0}, 0);
             // var relativeMomentum = Phaser.Physics.Matter.Matter.Vector.sub(bodyAMomentum, bodyBMomentum);
             if(force >= this.crushThreshold || this.breakFrame >= this.breakFrames.length ){
-                this.detailSprite.destroy();
-                this.destroy();
+                this.doCrush();
             }else if(force >= 0){
                 this.breakFrame = this.breakFrame + Math.round(force) < this.breakFrames.length ? this.breakFrame + Math.round(force) : this.breakFrames.length;
                 this.detailSprite.setFrame(this.breakFrames[this.breakFrame]);
