@@ -196,7 +196,7 @@ var GameScene = new Phaser.Class({
         
         //Once Game is ready, start updating HUD
         hud.setReady();
-
+        hud.playLevelTitle(lvlCfg.title);
         //Animations - Move to JSON later, if it makes sense       
         createAnimations(this);
 
@@ -1131,6 +1131,14 @@ var GameScene = new Phaser.Class({
                         gObjs[0].lockLight(gObjs[1],1);
                     }  
                 }
+                //Between Solbomb and Bright
+                if ((bodyA.label === 'SOLBOMB' && bodyB.label === 'BRIGHT') || (bodyA.label === 'BRIGHT' && bodyB.label === 'SOLBOMB')) {
+                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOLBOMB');
+                    if (gObjs[0].active){
+                        gObjs[0].unready();
+                        gObjs[1].receiveHealth(1);
+                    }  
+                }
                 //Between SoulTransfer and Solana
                 if ((bodyA.label === 'SOULTRANSFER' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'SOULTRANSFER')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULTRANSFER');
@@ -1513,8 +1521,8 @@ var GameScene = new Phaser.Class({
             let cam_p2 = this.cameras.add(camera_main.width/2,0,camera_main.width/2,camera_main.height,false,'cam_p2');//Second Camera
             cam_p1.setBounds(0, 0, map.widthInPixels, map.heightInPixels+128);  
             cam_p2.setBounds(0, 0, map.widthInPixels, map.heightInPixels+128);  
-            cam_p1.setZoom(2);
-            cam_p2.setZoom(2);
+            cam_p1.setZoom(1.75);
+            cam_p2.setZoom(1.75);
             cam_p1.startFollow(solana,true,.8,.8,0,0);
             cam_p2.startFollow(bright,true,.8,.8,0,0);
         }else{
@@ -1581,6 +1589,7 @@ var GameScene = new Phaser.Class({
 		this.scene.start('mainmenu');
     },
     generateEnergy(){
+        //This looks choppy. I need to make it a single factor, alter the factor and then apply it. 
         hud.alterEnergySolana(2);
         hud.alterEnergyBright(2);
     },
@@ -1690,29 +1699,36 @@ function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
         if(trigger.target.name != -1 && trigger.target.name != undefined){
             let nameList = trigger.target.name.split(",");//Comma delimited listing of target names
             nameList.forEach(name=>{
-                if(trigger.target.type == "gate"){
-                    //Search all gets
-                    gates.children.each(function(gate) {
-                        //console.log("Trigger had gate target, searching names");
-                        if(gate.name == name){
-                            trigger.setTarget(gate);
-                        }
-                    },trigger);
-                }else if(trigger.target.type == "zone"){
-                    triggerzones.children.each(function(zone) {
-                        //console.log("Trigger had gate target, searching names");
-                        if(zone.name == name){
-                            trigger.setTarget(zone);
-                        }
-                    },trigger);
-                }else if(trigger.target.type == "platform"){
-                    platforms.children.each(function(platform) {
-                        //console.log("Trigger had gate target, searching names");
-                        if(platform.name == name){
-                            trigger.setTarget(platform);
-                        }
-                    },trigger);
-                }
+ 
+                //Search all groups and setup targets
+                gates.children.each(function(gate) {
+                    //console.log("Trigger had gate target, searching names");
+                    if(gate.name == name){
+                        trigger.setTarget(gate);
+                    }
+                },trigger);
+
+                triggerzones.children.each(function(zone) {
+                    //console.log("Trigger had gate target, searching names");
+                    if(zone.name == name){
+                        trigger.setTarget(zone);
+                    }
+                },trigger);
+
+                platforms.children.each(function(platform) {
+                    //console.log("Trigger had gate target, searching names");
+                    if(platform.name == name){
+                        trigger.setTarget(platform);
+                    }
+                },trigger);
+
+                plates.children.each(function(plate) {
+                    //console.log("Trigger had gate target, searching names");
+                    if(plate.name == name){
+                        trigger.setTarget(plate);
+                    }
+                },trigger);
+                
             })
 
         }
