@@ -1136,7 +1136,8 @@ var GameScene = new Phaser.Class({
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOLBOMB');
                     if (gObjs[0].active){
                         gObjs[0].unready();
-                        gObjs[1].receiveHealth(1);
+                        gObjs[1].receiveHealth(1);                        
+                        hud.alterEnergyBright(50);
                     }  
                 }
                 //Between SoulTransfer and Solana
@@ -1212,6 +1213,19 @@ var GameScene = new Phaser.Class({
                     }
                     bulletObj.hit();
                     lampObj.turnOn();
+
+                }
+                //Lamps and Dark/Brigth
+                if ((bodyA.label === 'BRIGHT' && bodyB.label === 'CRYSTAL_LAMP') || (bodyA.label === 'CRYSTAL_LAMP' && bodyB.label === 'BRIGHT')) {
+                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'BRIGHT');
+                    if(gObjs[0].light_status == 0){
+                        //Bright mode, touching lamp drains energy and turns the lamp on.
+                        gObjs[1].turnOn();
+                        hud.alterEnergyBright(-50);
+                    }else{
+                        gObjs[1].breaklamp();
+                        hud.alterEnergyBright(50);
+                    }
 
                 }
                 //Lamps and Soul Tranfser
