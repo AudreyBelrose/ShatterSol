@@ -32,6 +32,7 @@ class Mirror extends Phaser.Physics.Matter.Sprite{
         .setVisible(false)
         .setStatic(true);    
 
+        this.setDepth(DEPTH_LAYERS.FG);
         //Mirror Sensor for Solana Interaction
         this.sensor = new MirrorSensor(this,x,y);
 
@@ -40,12 +41,13 @@ class Mirror extends Phaser.Physics.Matter.Sprite{
         this.minAngle = 0;
         this.maxAngle = 180;
         this.reflectAngle = 270;
+        this.name = "";
 
     }
-    setup(x,y,angle){
+    setup(x,y,angle,name){
         this.setActive(true);
         this.sprite.setIgnoreGravity(true);
-
+        this.name = name;
         this.setPosition(x,y);
         this.sensor.setPosition(x,y);
         //Mirror Constraint for pivoting
@@ -62,8 +64,8 @@ class Mirror extends Phaser.Physics.Matter.Sprite{
         this.angle = angle;
         this.minAngle = angle - 45;
         this.maxAngle = angle + 45;
-        this.flash = false;
 
+        this.flash = false;
         this.on('animationcomplete',this.mirrorAnimComplete,this); 
     }
     hit(){
@@ -78,11 +80,14 @@ class Mirror extends Phaser.Physics.Matter.Sprite{
         this.debug.setPosition(this.x, this.y-16);
         this.debug.setText("Angle:"+String(this.angle));
         //Check Rotation Constraints
-        if(this.angle > this.maxAngle){ this.angle = this.maxAngle; }
-        if(this.angle < this.minAngle){ this.angle = this.minAngle; }
+        if(this.angle > this.maxAngle){ this.angle = this.maxAngle;console.log("Adjusting Mirror > Max", this.name) }
+        if(this.angle < this.minAngle){ this.angle = this.minAngle;console.log("Adjusting Mirror < min", this.name) }
     }
     rotateMirror(x){
         this.angle+=x;
+    }
+    activateTrigger(r){
+        this.rotateMirror(r);
     }
     mirrorAnimComplete(animation, frame){
         this.anims.play('mirror-idle', true);//back to idle
@@ -118,5 +123,85 @@ class MirrorSensor extends Phaser.Physics.Matter.Image{
     update(time, delta)
     {       
 
+    }
+}
+
+//Add A bucket, or Y shape at the top to allow for easy rotation. Dark can just sit in and and roll.
+class TMXGear extends Phaser.Physics.Matter.Image{
+    constructor(scene,x,y) {
+        super(scene.matter.world, x, y, 'gear', 0)
+        
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+        this.setActive(true);
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        //Set Control Sensor - Player can't collide with mirrors, but bullets can. Sensor can detect player inputs.
+        const body =  Bodies.circle(0, 0, this.width*0.50);
+        // const prongLeft = Bodies.rectangle(-this.width/2, -this.height/2, this.width*0.10,this.height*0.50);
+        // const prongRight = Bodies.rectangle(this.width/2, -this.height/2, this.width*0.10,this.height*0.50);
+        // prongLeft.angle += Math.PI/4;
+        // prongRight.angle += -Math.PI/4;
+
+        const controlBody = Body.create({
+            parts: [body],
+            frictionStatic: 0.20,
+            frictionAir: 0.20,
+            friction: 1
+        });
+
+        this
+        .setExistingBody(controlBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setIgnoreGravity(true)  
+        .setVisible(false);
+
+    }
+    setup(x,y,properties,name,w,h){
+        this.setActive(true);        
+        this.setPosition(x,y);        
+        this.setSize(w,h);
+        this.setDisplaySize(w,h);
+        this.name = name;        
+        this.ready = true;
+        this.target = {name: -1,type: -1, object: []};
+
+        let rotation_constraint = Phaser.Physics.Matter.Matter.Constraint.create(
+            {
+              pointA: { x: this.x, y: this.y },
+              bodyB: this.body,
+              length: 0,
+              stiffness: 1
+            }
+          );
+        this.scene.matter.world.add(rotation_constraint);
+        if(properties){
+            this.target.name = properties.targetName;
+        }
+        this.prevAng = 0;
+        
+        this.debug = this.scene.add.text(this.x, this.y-16, 'plate', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5);  
+    }
+    setTarget(targetObject){
+        this.target.object.push(targetObject);
+    }
+    triggerTarget(r){
+        if(this.target.object.length > 0){
+            this.target.object.forEach(e=>{
+                e.activateTrigger(r);
+            });
+        }
+    }
+    update(time, delta)
+    {       
+        let roc = ~~(this.angle - this.prevAng);
+        this.debug.setPosition(this.x, this.y-16);
+        this.debug.setText("Data:"+String(this.angle.toFixed(2))+'roc:'+String(roc));
+
+        if(roc > 1){
+            this.triggerTarget(1);
+        }else if(roc < -1){
+            this.triggerTarget(-1);            
+        }
+        this.prevAng = this.angle
     }
 }

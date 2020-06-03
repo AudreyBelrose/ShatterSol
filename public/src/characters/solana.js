@@ -10,7 +10,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         
         const { width: w, height: h } = this.sprite;      
-        const mainBody = Bodies.rectangle(0, 0, w * 0.2, h*.50, { chamfer: { radius: 2 } });//WAs .65 for H
+        this.mainBody = Bodies.rectangle(0, 0, w * 0.2, h*.50, { chamfer: { radius: 2 } });//WAs .65 for H
+        console.log("solana body wXh",w * 0.2, h*.50)
         this.sensors = {
           top: Bodies.rectangle(0, -h*0.28, w * 0.15, 2, { isSensor: true, friction: 0.0 }), //Was .35 for H
           bottom: Bodies.rectangle(0, h*0.28, w * 0.15, 2, { isSensor: true, friction: 0.0 }),//Was .35 for H
@@ -24,7 +25,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.touching = {up:0,down:0,left:0,right:0};
         
         const compoundBody = Body.create({
-          parts: [mainBody, this.sensors.top, this.sensors.bottom, this.sensors.left, this.sensors.right],
+          parts: [this.mainBody, this.sensors.top, this.sensors.bottom, this.sensors.left, this.sensors.right],
           frictionStatic: 0.0,
           frictionAir: 0.08,
           friction: 0.35, //0.01
@@ -33,8 +34,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         });
         this.setScale(0.80);
        //Fix the draw offsets for the compound sprite.
-        compoundBody.render.sprite.xOffset = .51;
-        compoundBody.render.sprite.yOffset = .65;
+        compoundBody.render.sprite.yOffset = 0.15;
         compoundBody.label = "SOLANA";
 
         this.sprite
@@ -49,11 +49,13 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         //Custom Properties
         this.hp = 5;
         this.max_hp = 5;
+        this.energyChange = 0;
         this.max_mv_speed = {minX: -0.55,maxX: 0.55,minY: -4.9,maxY: 4.9, thrown: 10};
         this.max_mv_speed_baseX = 0.55;
         this.max_mv_speed_baseY = 4.9;
         this.mv_speed = 0.007; //0.00214285
         this.jump_speed = 0.045;//0.01846
+        this.climbSpeed = 0.001;
         this.mv_direction = {x:0,y:0};
         this.prev_position = {x:0,y:0};
         this.control_lock = false;
@@ -72,6 +74,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.isAnimLocked = false;//Locks out new animations from playing to allow one to finish.
         this.isStunned = false;
         this.isSlowed = false;
+        this.isInWater = false;
+        this.isClimbing = false;
         //Create Light Shield
         this.isShielding = false;
         this.LightShieldRadius = 20;
@@ -94,6 +98,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.jumpLock = false;
         this.jumpLockTimer;
         this.kickOff = this.mv_speed;
+        this.jumpData = {left:false,right:false,down:false};
         //Controller
         this.controller;
         this.ctrlDevice;
@@ -118,10 +123,14 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             }else if(this.isSlowed){
                 mv_speed = 0.00214285;
             }
+            if(this.isInWater){
+                this.addEnergy(-2);
+            }
 
             //Only control if currently the active control object
             let control_left = this.getControllerAction('left');
             let control_right = this.getControllerAction('right');
+            let control_up = this.getControllerAction('up');
             let control_down = this.getControllerAction('down');
             let control_shoot = this.getControllerAction('shoot');
             let control_shootRelease = this.getControllerAction('shootR');         
@@ -129,7 +138,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             let control_passRelease = this.getControllerAction('passR');
             let control_brightFollow = this.getControllerAction('brightFollow');
             let control_bomb = this.getControllerAction('bomb');
-            let control_grab = this.getControllerAction('grab');
+            let control_grab = this.getControllerAction('grab');            
+            let control_jumphold = this.getControllerAction('jumphold');
             //console.log("SOL_R:",control_right,this.getControllerAction('right'),keyPad.checkKeyState('D'));
 
             if (this.control_lock == false) {
@@ -160,7 +170,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                 if ((this.onGround || this.onWall) && this.body.velocity.y >= 0) { this.jumpCount = 0 }; //Add velocity check to not reset jump count if going up.
 
                 //Check Jump ready
-                if (this.onGround || this.onWall || (soullight.ownerid == 0 && soullight.claimed && this.jumpCount < 2)) {
+                let sb_1_owned = checkSolbitOwned(1);
+                if (this.onGround || this.onWall || this.isInWater || (soullight.ownerid == 0 && sb_1_owned && this.jumpCount < 2)) {
                     this.jumpReady = true;
 
                 } else {                    
@@ -169,11 +180,22 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                         this.jumpTimer = this.scene.time.addEvent({ delay: 100, callback: this.forgiveJump, callbackScope: this, loop: false });
                         this.jumpTimerRunning = true;
                     }
+                    if(this.jumpCount > 0 && !sb_1_owned || this.jumpCount > 1 && sb_1_owned){
+                        this.jumpReady = false;
+                    }
+                    //If Jump is held and the body is going up, extend the jump power and time
+                    if(control_jumphold && this.body.velocity.y < 0){
+                        this.applyForce({x:0,y:-this.jump_speed*0.025});
+                    }
                 }
-
+                //Update Jump Data for Wallkicks
+                if(this.jumpReady){
+                    this.jumpData = {left:(this.touching.left > 0),right:(this.touching.right > 0),down:this.onGround};
+                }
                 //ANIMATION HANDLING
                 if (!this.onGround) { 
-                    if (!this.isAnimLocked) { this.sprite.anims.play('solana-jump', true); };
+                    if (!this.isAnimLocked && !this.isClimbing) { this.sprite.anims.play('solana-jump', true); };
+                    if (!this.isAnimLocked && this.isClimbing) { this.sprite.anims.play('solana-ladder', true); };                    
                 }else if (this.mv_direction.x == 0) {
                     if (!this.isAnimLocked) { this.sprite.anims.play('solana-idle', true); };
                 } else {
@@ -195,8 +217,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
 
                 //Slow Descent if on Wall
                 if (this.onWall && !this.onGround) {
-                    if (Math.round(this.body.velocity.y) >= 0) { //Upwards
-                        this.setVelocityY(0);
+                    if (Math.round(this.body.velocity.y) >= 0) { //Downwards
+                        //this.setVelocityY(0);
                         if (!this.isAnimLocked) { this.sprite.anims.play('solana-wallslide', true); };
                     }
                 }
@@ -291,6 +313,13 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                             }
                         }
                     }
+                    if(this.isClimbing){
+                        if(control_up){
+                            this.applyForce({x:0,y:-this.climbSpeed});
+                        }else if(control_down){
+                            this.applyForce({x:0,y:this.climbSpeed});
+                        }
+                    }
                 }
             }
             
@@ -310,7 +339,10 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             if(this.body.velocity.y > this.max_mv_speed.maxY ){this.setVelocityY(this.max_mv_speed.maxY+0.1);};//0.1 from Jenkins testing
         }  
 
+
         //DO THIS LAST
+        this.resetEnergy();
+
         this.mv_Xdiff = Math.round(this.x - this.prev_position.x);
         this.mv_Ydiff = Math.round(this.y - this.prev_position.y);
         this.prev_position.x = this.x;
@@ -340,6 +372,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                     return (gamePad[this.ctrlDeviceId].getStickLeft(.5).x > 0);
                 case 'jump':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('A') == 1);
+                case 'jumphold':
+                    return (gamePad[this.ctrlDeviceId].checkButtonState('A') > 1);
                 case 'bomb':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('B') == 1);
                 case 'grab':
@@ -371,6 +405,8 @@ class Solana extends Phaser.Physics.Matter.Sprite{
                     return (keyPad.checkKeyState('D') > 0);
                 case 'jump':
                     return (keyPad.checkKeyState('SPC') == 1);
+                case 'jumphold':
+                    return (keyPad.checkKeyState('SPC') > 1);
                 case 'bomb':
                     return (keyPad.checkKeyState('G') == 1);
                 case 'grab':
@@ -399,6 +435,12 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         //Sets the controller Source
         this.ctrlDeviceId = ctrlId;
     }
+    getBodyWidth(){
+        return solana.body.bounds.max.x - solana.body.bounds.min.x;
+    }
+    getBodyHeight(){
+        return solana.body.bounds.max.y - solana.body.bounds.min.y;
+    }
     kickDusk(n){
         let bVec = this.getBottomCenter();
         for(let i = 0;i < n;i++){
@@ -410,6 +452,49 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.max_mv_speed.maxX = this.max_mv_speed_baseX+xMax;
         this.max_mv_speed.minY = -this.max_mv_speed_baseY+yMin;
         this.max_mv_speed.maxY = this.max_mv_speed_baseY+yMax;
+    }
+    ledgeGrab(dir,yGain){
+        //Needs a check on the area above the hull she grabs to make sure there is a clear path and space for her. use the rectIntersect check and raycast
+        //That should fix buggy issues
+        yGain = Math.floor(yGain);
+        if(!this.isledgeGrabbing){            
+            let control_left = this.getControllerAction('left');
+            let control_right = this.getControllerAction('right');
+            let bdht = this.getBodyHeight();
+            let bdWd = this.getBodyWidth();
+            let ctrlCk = (control_left || control_right);
+            if(dir == 'l' && control_left){
+                bdWd = bdWd*-1;
+            }else if(dir == 'r' && control_right){
+                //NOrmal, just positive
+            }
+            if(ctrlCk){
+                let clearCheck = this.scene.matter.intersectRect(this.x+bdWd/2,this.y-yGain,bdWd,bdht,false,losBlockers);
+                this.grabrect = this.scene.add.rectangle(this.x+bdWd/2,this.y-yGain,bdWd,bdht,0xFF0000,1.0);            
+                //console.log("LedgeGrab from Left",dir,yGain,clearCheck,this.x+bdWd/2,this.y-yGain,bdWd,bdht);
+                if(clearCheck.length < 2){
+                    this.isledgeGrabbing = true;
+                    this.setIgnoreGravity(true);
+                    let twflyaway = this.scene.tweens.add({
+                        targets: this,
+                        x: this.x+bdWd/2,
+                        y: this.y - yGain,               
+                        ease: 'Linear',       
+                        duration: 300,  
+                        onComplete: function(tween, targets, solanaObj){
+                            solanaObj.isledgeGrabbing = false;
+                            console.log("Ledge Grab Finished");
+                            solanaObj.setIgnoreGravity(false);
+                            solanaObj.grabrect.destroy();
+                        },
+                        onCompleteParams: [this],
+                    });
+                }else{
+                    this.grabrect.destroy();
+                }
+            }
+
+        }
     }
     jumpLockReset(){
         this.jumpLock = false;
@@ -443,28 +528,24 @@ class Solana extends Phaser.Physics.Matter.Sprite{
             this.setVelocityY(0);
         }
                
-        if(this.touching.left > 0 && !this.onGround){
+        if(this.jumpData.left && !this.jumpData.down){
             this.setMaxMoveSpeed(-6,6,-6,6);
-            this.sprite.applyForce({x:mvVel*4,y:-0.003});
+            this.sprite.applyForce({x:mvVel*4.2,y:-0.003});
             this.jumpLock = true;
             this.kickOff = mvVel;
             this.jumpLockTimer = this.scene.time.addEvent({ delay: 200, callback: this.jumpLockReset, callbackScope: this, loop: false });
         }
-        if(this.touching.right > 0 && !this.onGround){            
+        if(this.jumpData.right && !this.jumpData.down){            
             this.setMaxMoveSpeed(-6,6,-6,6);
-            this.sprite.applyForce({x:-mvVel*4,y:-0.003});
+            this.sprite.applyForce({x:-mvVel*4.2,y:-0.003});
             this.jumpLock = true;
             this.kickOff = -mvVel;
             this.jumpLockTimer = this.scene.time.addEvent({ delay: 200, callback: this.jumpLockReset, callbackScope: this, loop: false });
             
         }
-        //Note that onWall requires pushing in the direction of the wall. Touching should just the sensor.   
+        
         if(this.onWall && this.onGround){
-            //this.sprite.applyForce({x:0,y:-jumpVel*1.40}); //BUG - THIS IS APPLYING TO PLATFORM SENSOR BARS AS WELL.
-            //I could fix by maybe lowing the sensor bar height on the platforms, or by making some custom checks.
-
-            //This was intended to fix being stuck in a corner when you jump, but it may not be needed.
-            this.sprite.applyForce({x:0,y:-jumpVel});
+             this.sprite.applyForce({x:0,y:-jumpVel});
         }else{
             this.sprite.applyForce({x:0,y:-jumpVel});
         }
@@ -593,6 +674,7 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         this.alive = true; 
         this.scene.scene.restart();
         hud.setHealth(this.hp);
+        this.addEnergy(1500);
     }
     receiveDamage(damage) {
                 
@@ -631,6 +713,13 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         };
        hud.setHealth(this.hp,0);
     }
+    addEnergy(e){
+        this.energyChange+=e;
+    }
+    resetEnergy(){
+        hud.alterEnergySolana(this.energyChange);
+        this.energyChange = 0;
+    }
     disableInvuln(){
         this.invuln = false;
         this.clearTint();
@@ -655,12 +744,14 @@ class Solana extends Phaser.Physics.Matter.Sprite{
         }
     }
     enterWater(){
-        this.setFrictionAir(0.25);
+        this.setFrictionAir(0.35);
         this.jump_speed = 0.055;
+        this.isInWater = true;
     }
     exitWater(){
         this.setFrictionAir(0.08);
         this.jump_speed = 0.045;
+        this.isInWater = false;
     }
 }
 
@@ -700,6 +791,7 @@ class LightShield extends Phaser.Physics.Matter.Sprite{
             restitution: 1.0
         });
         compoundBody.render.sprite.xOffset = 0.63;
+        compoundBody.render.sprite.yOffset = 0.50;
 
         this
         .setExistingBody(compoundBody)
@@ -708,6 +800,7 @@ class LightShield extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y) // Sets inertia to infinity so the player can't rotate        
         .setIgnoreGravity(true);
 
+        this.setDepth(DEPTH_LAYERS.PLAYERS);
         this.setAlpha(0.65);
 
         this.holdConstraint = Phaser.Physics.Matter.Matter.Constraint.create({
@@ -769,7 +862,7 @@ class SolBomb extends Phaser.Physics.Matter.Sprite{
         .setFixedRotation();
 
         this.setScale(0.75);
-
+        this.setDepth(DEPTH_LAYERS.PLAYERS);
         this.orbitpos = 0;
         //this.orbitOS = Phaser.Math.FloatBetween(0,0.15); //Offset
         this.orbitOS = solbombs.getTotalUsed()*0.20; //Offset
@@ -850,12 +943,16 @@ class SolBomb extends Phaser.Physics.Matter.Sprite{
             this.scene.matter.world.add(this.holdConstraint);   
 
             this.isGrabbed  = true;
+            
+            this.setIgnoreGravity(true);
         }
     }
     released(){
         if(this.isGrabbed){
             this.scene.matter.world.remove(this.holdConstraint);
             this.isGrabbed  = false;
+            
+            this.setIgnoreGravity(false);
         }
     }
     enterWater(){

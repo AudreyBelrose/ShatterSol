@@ -18,7 +18,7 @@ class Barrier extends Phaser.Physics.Matter.Sprite{
 
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         const { width: w, height: h } = this.sprite;
-        const mainBody =  Bodies.rectangle(0, 0, w, h);
+        const mainBody =  Bodies.rectangle(0, 0, w*0.33, h, {chamfer : {radius: 2}});
 
         const compoundBody = Body.create({
             parts: [mainBody],
@@ -55,7 +55,7 @@ class Barrier extends Phaser.Physics.Matter.Sprite{
     {       
 
         this.debug.setPosition(this.x, this.y-16);
-        this.debug.setText("Zone Status:"+String(this.name));
+        this.debug.setText("Barrier:"+String(this.name));
     }
 };
 
@@ -89,6 +89,7 @@ class Crate extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y) 
 
         this.isGrabbed  = false;
+        this.max_speed = 5;
     }
     setup(x,y){
         this.setActive(true);
@@ -109,6 +110,16 @@ class Crate extends Phaser.Physics.Matter.Sprite{
                 this.clearTint();
             }
         }
+        if(this.body.velocity.x > this.max_speed){this.setVelocityX(this.max_speed)};
+        if(this.body.velocity.x < -this.max_speed){this.setVelocityX(-this.max_speed)};
+        if(this.body.velocity.y > this.max_speed){this.setVelocityY(this.max_speed);};
+        if(this.body.velocity.y < -this.max_speed){this.setVelocityY(-this.max_speed)};
+        //Body Impulse Limit
+        if(this.body.positionImpulse.x > this.max_speed){this.body.positionImpulse.x = this.max_speed};
+        if(this.body.positionImpulse.x < -this.max_speed){this.body.positionImpulse.x = -this.max_speed};
+        if(this.body.positionImpulse.y > this.max_speed){this.body.positionImpulse.y = this.max_speed};
+        if(this.body.positionImpulse.y < -this.max_speed){this.body.positionImpulse.y = -this.max_speed};
+
     }
     grabbed(){
         if(!this.isGrabbed){
@@ -123,12 +134,14 @@ class Crate extends Phaser.Physics.Matter.Sprite{
             this.scene.matter.world.add(this.holdConstraint);   
 
             this.isGrabbed  = true;
+            this.setIgnoreGravity(true);
         }
     }
     released(){
         if(this.isGrabbed){
             this.scene.matter.world.remove(this.holdConstraint);
             this.isGrabbed  = false;
+            this.setIgnoreGravity(false);
         }
     }
     
@@ -159,14 +172,15 @@ class Rock extends Phaser.Physics.Matter.Sprite{
             frictionStatic: 0.01,
             frictionAir: 0.05,
             friction: 1.0,
-            density: 0.5,
+            density: 0.01,
             label: "ROCK"
         });
-
         this
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.SOLID)
         .setPosition(x, y) 
+        .setDensity(0.01)
+        .setDepth(DEPTH_LAYERS.OBJECTS);
 
         //Setup Collision
         this.scene.matterCollision.addOnCollideStart({
@@ -175,9 +189,12 @@ class Rock extends Phaser.Physics.Matter.Sprite{
                 const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
                 
                 if (gameObjectB !== undefined && gameObjectB instanceof Bright) {
-                    if(gameObjectB.light_status == 1){//ONLY DARK CAN CRUSH ROCKS
+                    if(gameObjectB.light_status == 1){//ONLY DARK  MODE CAN CRUSH ROCKS
                         this.impact(gameObjectB);
                     }
+                }
+                if(gameObjectB !== undefined && gameObjectB instanceof SoulTransfer){
+                    this.impact(gameObjectB);
                 }
             }
         });
@@ -192,7 +209,8 @@ class Rock extends Phaser.Physics.Matter.Sprite{
         this.readyCrush = false;
         this.crushTimer = this.scene.time.addEvent({ delay: 300, callback: this.setReadyCrush, callbackScope: this, loop: false });
         //Add it so rocks an only collide with ground,solid and dark for a few ms. should allow me to use them as an effect.
-        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK,CATEGORY.BRIGHT]);
+        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK,CATEGORY.BRIGHT,CATEGORY.BULLET,CATEGORY.BARRIER]);
+        
     }
     update(time, delta)
     {       
@@ -203,16 +221,16 @@ class Rock extends Phaser.Physics.Matter.Sprite{
     }
     setReadyCrush(){
         this.readyCrush = true;
-        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK,CATEGORY.SOLANA,CATEGORY.VEHICLE]);
+        this.setCollidesWith([CATEGORY.SOLID,CATEGORY.GROUND,CATEGORY.DARK,CATEGORY.SOLANA,CATEGORY.VEHICLE,CATEGORY.BULLET,CATEGORY.BARRIER]);
     }
     impact(obj){
         if(this.readyCrush){
             this.sound_gotCrushed.play();
-            let fromBody = obj.body;
-            let speed = Math.sqrt(Math.pow(fromBody.velocity.x,2)+Math.pow(fromBody.velocity.y,2));
-            let force = speed*fromBody.density*100;
-            if(force >= 2){                
-                //console.log("Rock Impact", force >> 0,speed >> 0,fromBody.density);
+            let fromBody = obj.body;            
+            let force = fromBody.speed*fromBody.density*100;
+            //console.log("Rock Impact", force);
+            if(force >= 1){                
+                
                 if(Phaser.Math.Between(1,5) == 1){ //20%
                     if(this.scale > 0.25){
                         for(let r=0;r< Phaser.Math.Between(1,3);r++){
@@ -223,17 +241,24 @@ class Rock extends Phaser.Physics.Matter.Sprite{
                     }                   
                     this.destroy();
                 }else{
-                    this.getShards();
-                    this.destroy();
+                    this.finalCrush();
                 }
 
             }
         }
     }
+    finalCrush(){
+        this.getShards();
+        this.destroy();
+    }
     getShards(){
-        for(let i=0;i < Phaser.Math.Between(1,3);i++){
-            let ls = light_shards.get();
-            ls.spawn(this.x,this.y,300,solana);
+        let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:this.x,y:this.y});
+        //Only spawn shards if within range and has a clear line of sight.
+        if(Phaser.Math.Distance.Between(solana.x,solana.y,this.x,this.y) < 744 && losRc.length == 0){
+            for(let i=0;i < Phaser.Math.Between(1,3);i++){
+                let ls = light_shards.get();
+                ls.spawn(this.x,this.y,300,solana);
+            }
         }
     }    
     enterWater(){
@@ -267,7 +292,8 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
 
         this
         .setExistingBody(compoundBody)
-        .setCollisionCategory(CATEGORY.SOLID)
+        .setCollisionCategory(CATEGORY.SOLID)        
+        .setCollidesWith([CATEGORY.SOLANA, CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.SOLID, CATEGORY.GROUND])
         .setPosition(x, y)
         .setFixedRotation() 
         .setStatic(true);
@@ -291,12 +317,12 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
         this.shakeCount = ct;
     }
     reset(){
+        console.log("platfall reset");
         this.setActive(true);
         this.setPosition(this.spawnPos.x,this.spawnPos.y); 
         //this.ready = true;
         this.dead = false;
         this.setStatic(true);
-        console.log("platfall reset");
         let tween = this.scene.tweens.add({
             targets: this,
             alpha: 1.0,              
@@ -308,9 +334,9 @@ class Fallplat extends Phaser.Physics.Matter.Sprite{
     }
     setDead(){
         if(!this.dead){
+            console.log("platfall dead");
             this.dead = true;
             this.alpha = 0.0;
-            console.log("platfall dead");
             this.resetTimer = this.scene.time.addEvent({ delay: 4000, callback: this.reset, callbackScope: this, loop: false });
         }
     }
@@ -381,7 +407,9 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
                 const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
                 
                 if (gameObjectB !== undefined && gameObjectB instanceof BrightSensors) {
-                    this.impact(gameObjectB);
+                    if(bright.light_status == 1){
+                        this.impact(gameObjectB);
+                    }
                 }
             }
         });
@@ -416,6 +444,7 @@ class BreakableTile extends Phaser.Physics.Matter.Sprite{
             newRock.setup(this.x,this.y,0.25);  
             newRock.applyForce({x:Phaser.Math.FloatBetween(-0.0010,0.0010),y:Phaser.Math.FloatBetween(0.0,-0.0010)});                     
         }
+        camera_main.shake(80,.005);
         this.detailSprite.destroy();
         this.destroy();
     }
@@ -493,6 +522,7 @@ class SecretTile extends Phaser.Physics.Matter.Sprite{
 
         this.ready = true;
         this.debug = this.scene.add.text(this.x, this.y, 'SECRET', { resolution: 2, fontSize: '8px', fill: '#00FF00' }).setDepth(DEPTH_LAYERS.FG).setOrigin(0.5);
+        this.debug.setVisible(false);
     }
     setup(x,y){
         this.setActive(true);
@@ -627,7 +657,7 @@ class PlatSwingTween extends Phaser.Physics.Matter.Sprite{
             parts: [mainBody, this.sensors.bottom, this.sensors.top],
             frictionStatic: 0,
             frictionAir: 0.00,
-            friction: 0,//Was 0.1
+            friction: 1,//Was 0.1
             label: 'PLATSWING'
         });
 
@@ -648,10 +678,40 @@ class PlatSwingTween extends Phaser.Physics.Matter.Sprite{
         //Fake Velocity
         this.prev = {x:x,y:y};
         this.onWayTracker = -1;
+
+        //Setup to allow to carry riders
+        this.scene.matterCollision.addOnCollideActive({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                    let bVelX = gameObjectA.body.velocity.x;
+                    let bVelY = gameObjectA.body.velocity.y;
+                    let minX = bVelX < 0 ? bVelX : 0;
+                    let maxX = bVelX > 0 ? bVelX : 0;
+                    let minY = bVelY < 0 ? bVelY : 0;
+                    let maxY = bVelY > 0 ? bVelY : 0;
+                    gameObjectB.setMaxMoveSpeed(minX,maxX,minY,maxY);
+                }
+            }
+        });
+        this.scene.matterCollision.addOnCollideEnd({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                    gameObjectB.setMaxMoveSpeed(0,0,0,0);
+                }
+            }
+        });
     }
-    setup(x,y,properties,name){
+    setup(x,y,properties,name,w,h){
         this.setActive(true); 
         this.setPosition(x,y);
+        this.setSize(w,h);
+        this.setDisplaySize(w,h);
         this.name = name;
         this.swingDeg = properties.start;
         this.swingRadius = properties.radius;
@@ -796,9 +856,14 @@ class TMXWater{
     constructor(scene,x,y,w,h,d,opt){
         this.scene = scene;
 
-        this.waterbody = this.scene.add.water(x, y, w, h, d, opt);
+        //this.waterbody = this.scene.add.water(x, y, w, h, d, opt);
+        //NOTE: ObjectA was this.waterbody.sensor
+        this.waterbody = this.scene.matter.add.rectangle(x+w/2,y+h/2,w,h, {isStatic:true, isSensor:true});
+        this.brightBlocker = this.scene.matter.add.rectangle(x+w/2,y+h/2,w,h, {isStatic:true, collisionFilter: {mask:CATEGORY.BRIGHT}});
+        this.sprite = this.scene.add.rectangle(x+w/2,y+h/2,w,h,0x0099ff,0.7)
+        //console.log("Waterbody",this.waterbody)
         this.scene.matterCollision.addOnCollideStart({
-            objectA: this.waterbody.sensor,
+            objectA: this.waterbody,
             callback: ({ gameObjectB, gameObjectA }) => {
                 if(gameObjectB instanceof Solana
                     || gameObjectB instanceof Bright
@@ -809,16 +874,16 @@ class TMXWater{
                     || gameObjectB instanceof Bullet){
                         
                         gameObjectB.enterWater();
-                        const i = gameObjectA.columns.findIndex((col, i) => col.x >= (gameObjectB.x-gameObjectA.x) && i);	
-                        const speed = gameObjectB.body.speed * 3;	                        
-                        const numDroplets = Math.ceil(gameObjectB.body.speed) * 5;		
-                        gameObjectA.splash(Phaser.Math.Clamp(i, 0, gameObjectA.columns.length - 1), speed, numDroplets);
+                        // const i = gameObjectA.columns.findIndex((col, i) => col.x >= (gameObjectB.x-gameObjectA.x) && i);	
+                        // const speed = gameObjectB.body.speed * 3;	                        
+                        // const numDroplets = Math.ceil(gameObjectB.body.speed) * 5;		
+                        // gameObjectA.splash(Phaser.Math.Clamp(i, 0, gameObjectA.columns.length - 1), speed, numDroplets);
  
                 }
             },
         });
         this.scene.matterCollision.addOnCollideEnd({
-            objectA: this.waterbody.sensor,
+            objectA: this.waterbody,
             callback: ({ gameObjectA: wb, gameObjectB, }) => {
                 if(gameObjectB instanceof Solana
                     || gameObjectB instanceof Bright
@@ -835,7 +900,146 @@ class TMXWater{
         //Construct set position function?
     }
 }
+//TMZ Liquid drops (Water puts out bright, turns him to dark. Acid hurts Dark. Corruption hurts Solana.)
+class Droplet extends Phaser.Physics.Matter.Sprite{
+    constructor(scene,x,y) {
+        super(scene.matter.world, x, y, 'liquiddroplet', 0)
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+        this.setActive(true);
 
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        const mainBody =  Bodies.rectangle(x,y,w*0.50,h*0.50);
+
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0,
+            frictionAir: 0.20,
+            friction: 0.1,//Was 0.1
+            label: 'LIQUIDDROP'
+        });
+
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.LIQUID)
+        .setCollidesWith([CATEGORY.GROUND])
+        .setFixedRotation()
+        .setIgnoreGravity(true)
+        .setPosition(x, y); 
+
+        this.scene.matterCollision.addOnCollideStart({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                    //gameObjectA.destroy();
+                }
+                if (gameObjectB !== undefined && bodyB.label == 'GROUND') {
+                    if(gameObjectA.hitGround == false){ gameObjectA.impact();};
+                }
+            }
+        });
+        this.setTint(0x0000CC);
+        let dripPosY = this.y+this.height*1.5
+        this.twfall = this.scene.tweens.add({
+            targets: this,
+            height: h*2.0,
+            width: w*0.5,
+            displayHeight: h*2.0,
+            displayWidth: w*0.5,              
+            y: dripPosY ,
+            ease: 'Linear',       
+            duration: 500,  
+            onComplete: function(tween, targets, mydrop){
+                mydrop.setIgnoreGravity(false);
+                mydrop.setDepth(DEPTH_LAYERS.FG);
+            },
+            onCompleteParams: [this],
+        });
+        this.id =0;
+        this.hitGround = false;
+
+    }
+    impact(){
+        this.hitGround = true;
+        this.angle = 0;
+        let w = Phaser.Math.Between(this.width/2,this.width);
+        let h = this.height;
+        let rW = Phaser.Math.Between(16,32)
+        this.twimpact = this.scene.tweens.add({
+            targets: this,
+            height: 2,
+            width: rW,
+            displayHeight: 2,
+            displayWidth: rW,
+            ease: 'Linear',       
+            duration: 300,  
+            onComplete: this.splashdown,
+            onCompleteParams: [this],
+        });
+        //console.log("impact",this.id);
+    }
+    setup(x,y, properties,name){
+        this.setActive(true); 
+        this.setPosition(x,y);
+        this.name = name;
+ 
+    }
+    splashdown(tween, targets, mydrop){
+        mydrop.splashtimer = mydrop.scene.time.addEvent({ delay: 1000, callback: mydrop.createdrips, callbackScope: mydrop, loop: false });
+        //console.log("splashdown",mydrop.id);
+    }
+    createdrips(){
+        this.drips = [];
+        for(let d=0;d < Phaser.Math.Between(0,4);d++){
+            this.drips.push({x:this.x + Phaser.Math.Between(-this.width/4,this.width/4),y:this.y,n:0,m:Phaser.Math.Between(4,12)});
+        }
+        this.dripTimer = this.scene.time.addEvent({ delay: 80, callback: this.moddrips, callbackScope: this, loop: true });
+        this.gfxDrips = this.scene.add.graphics();
+        this.gfxDrips.setDepth(DEPTH_LAYERS.FG);
+        this.lifeTimer = this.scene.time.addEvent({ delay: 3000, callback: this.removedroplet, callbackScope: this, loop: false });
+    }
+    moddrips(){
+        let maxCount = 0;
+        this.drips.forEach(e=>{
+            if(e.n < e.m){
+                e.n++;
+            }else{
+                maxCount++;
+            }
+            
+        },this)
+        this.dripdown();        
+    }
+    dripdown(){    
+        this.gfxDrips.clear(); 
+        this.gfxDrips.lineStyle(1, 0x0000CC, 0.9);
+        this.drips.forEach(e=>{
+            this.gfxDrips.beginPath();
+            this.gfxDrips.moveTo(e.x, e.y);
+            this.gfxDrips.lineTo(e.x, e.y+e.n);
+            this.gfxDrips.closePath();
+            this.gfxDrips.strokePath();
+        },this)
+
+    }
+    removedroplet(){
+        this.gfxDrips.clear(); 
+        this.twfall.remove();
+        this.twimpact.remove();
+        this.dripTimer.remove()
+        this.gfxDrips.destroy();
+        this.destroy();
+    }
+    update(time, delta)
+    {       
+        this.setRotation(0);
+
+    }
+};
 //Chest
 class Chest extends Phaser.Physics.Matter.Sprite{
     constructor(scene,x,y) {
@@ -857,7 +1061,7 @@ class Chest extends Phaser.Physics.Matter.Sprite{
             label: 'CHEST'
         });
 
-        compoundBody.render.sprite.yOffset = .65; 
+        compoundBody.render.sprite.yOffset = 0.23; 
         this
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.SOLID)

@@ -1,4 +1,5 @@
 //When enemies are hit, they lose globs of oily shadow, of varying size, that fly off of them.
+//let testbody = playScene.matter.add.softBody(solana.x+32,solana.y-64,2,2,-4,0,true,8,{ignoreGravity: false,collisionFilter: {mask: 130 }},{})
 var ENEMY_WEAPONS = [
     {name: 'slime_lob',aimmed:false,prjTexture:'bullet',prjLife:600,prjVec:{x:1,y:-1},range:256,onDeath:[]},//0
     {name: 'slime_melee',aimmed:false,prjTexture:'bullet',prjLife:32,prjVec:{x:1,y:0},range:32,onDeath:[]},
@@ -7,7 +8,18 @@ var ENEMY_WEAPONS = [
     {name: 'claw',aimmed:false,prjTexture:'bullet',prjLife:16,prjVec:{x:2,y:0},range:64,onDeath:[]},
     {name: 'darkblip_shoot',aimmed:true,prjTexture:'bullet',prjLife:900,prjVec:{x:1,y:0},range:400,onDeath:[]}//5
 ]
-
+class PathingNode{
+    constructor(name,points,x,y){
+        this.name = name;
+        this.points = points;
+        this.x = x;
+        this.y = y;
+        this.worldpoints = [];
+        points.forEach(e=>{
+            this.worldpoints.push({x:e.x+x,y:e.y+y});
+        },this)
+    }
+}
 class Enemy extends Phaser.Physics.Matter.Sprite{
     constructor(scene,x,y,texture) {
         super(scene.matter.world, x, y, texture, 0)
@@ -43,8 +55,8 @@ class Enemy extends Phaser.Physics.Matter.Sprite{
           density: 0.03,
         });
        //Fix the draw offsets for the compound sprite.
-        // compoundBody.render.sprite.xOffset = .5;
-        // compoundBody.render.sprite.yOffset = .60;
+        compoundBody.render.sprite.xOffset = .50;
+        compoundBody.render.sprite.yOffset = .50;
         compoundBody.label = "ENEMY";
 
         this
@@ -147,17 +159,13 @@ class Enemy extends Phaser.Physics.Matter.Sprite{
             }
         }
 
-        let waypointString = "";
-        this.waypoints.forEach(e=>{
-            waypointString+="{"+e.x+":"+e.y+"},";
-        });
         // this.debug.setPosition(this.x, this.y-64);
         // this.debug.setText("BehavPass:"+this.behavior.passive
         // +"\nX:"+String(this.x>>0)+", Y:"+String(this.y>>0)
         // +"\nPatrolPath:"+waypointString);
     }
     setPath(path){
-        this.waypoints = JSON.parse(path);
+        this.waypoints = path;
     }
     changeWeapon(speedVec,index,gun){
         this.wpSpeedMod = speedVec;//{x:4,y:1}
@@ -299,7 +307,7 @@ class Enemy extends Phaser.Physics.Matter.Sprite{
     }
     setBehavior(p,a,wp){
         this.behavior = {passive:p,aggressive:a,weapon:ENEMY_WEAPONS[wp]};
-        console.log("Enemy Set Behavior",this.behavior);
+        //console.log("Enemy Set Behavior",this.behavior);
     }
     death(animation, frame){
         for(let i=0;i < Phaser.Math.Between(1,5);i++){
@@ -867,5 +875,512 @@ class EnemySpider extends Phaser.Physics.Matter.Sprite{
             return false;
         }
         
+    }
+}
+
+//Mines Enemies
+//Shrieker Mushroom
+//Ooze blob
+//Bats
+
+class EnemyBlob{
+    constructor(scene,x,y, collidesWith) {
+        this.scene = scene;
+        let mask = collidesWith.reduce(function(a,b){return a+b},0);
+        this.bodystructure = this.scene.matter.add.softBody(x,y,4,3,-2,0,true,4,{ignoreGravity: false,collisionFilter: {mask: 130, category: CATEGORY.ENEMY }},{stiffness: 0.9});
+        console.log(this.bodystructure); 
+        this.images = [];
+        for(let b=0;b< this.bodystructure.bodies.length;b++){
+            let blobbody = this.bodystructure.bodies[b];
+            this.images.push(scene.add.image(blobbody.position.x,blobbody.position.y,'oilblob2'));
+           
+        }
+
+
+        console.log("Enemy Blob Created",this);
+        this.scene.events.on("update", this.update, this);
+    }
+    update(time,delta){
+        for(let i=0;i<this.images.length;i++){
+            let img = this.images[i];
+            img.setPosition(this.bodystructure.bodies[i].position.x,this.bodystructure.bodies[i].position.y);
+        }
+    }
+}
+
+class EnemyBlobA{
+    constructor(scene,x,y,w,h){
+        this.scene = scene;
+        let shapeObject = this.scene.add.rectangle(x + (w / 2), y + (h / 2),w, h);
+        this.blobObj = this.scene.matter.add.gameObject(shapeObject, { shape: { type: 'rectangle', flagInternal: true } });
+        this.blobObj.setCollisionCategory(CATEGORY.ENEMY);
+        this.blobObj.setCollidesWith([CATEGORY.GROUND,CATEGORY.SOLANA]);
+        this.blobImgs = [];
+        this.rowCount = Math.floor(h/8);
+        this.colCount = Math.floor(w/8);
+        
+        // for(let j=0;j<Math.floor(h/8);j++){
+        //     for(let i=0;i<Math.floor(w/8);i++){
+        //         this.blobImgs.push({c:i,r:j,img:this.scene.add.image(x+(i*8),y+(j*8),'oilblob2')});
+        //     } 
+        // }
+        for(let j=0;j<this.rowCount;j++){
+            for(let randSpawn=0;randSpawn < j+1;randSpawn++){
+                let xR = Phaser.Math.Between(0+(this.rowCount-j)/2,this.colCount-(this.rowCount-j)/2);
+                this.blobImgs.push({c:xR,r:j,img: this.scene.add.image(x+(xR*8),y+(j*8),'oilblob2')});
+            }
+        }
+
+        this.scene.events.on("update", this.update, this);
+    }
+    update(time,delta){
+        // for(let i=0;i<this.blobImgs.length;i++){
+        //     let bImb = this.blobImgs[i];
+        //     bImb.img.setPosition(this.blobObj.x-this.blobObj.width/2+bImb.c*8+4,this.blobObj.y-this.blobObj.height/2+bImb.r*8+4);
+        // }
+        for(let i=0;i<this.blobImgs.length;i++){
+            let bImb = this.blobImgs[i];
+            bImb.img.setPosition(this.blobObj.x-this.blobObj.width/2+bImb.c*8+4,this.blobObj.y-this.blobObj.height/2+bImb.r*8+4);
+        }
+    }
+}
+class EnemyBlobC{
+    //It should try to engulf Solana.
+    //It can only be destroyed if every blob is destroyed. It will slowly regenerate missing blobs/
+    //Blobs destroy if they get too far away from it.
+    //It can maybe fling blobs?
+    //let blob = new EnemyBlobC(playScene,solana.x+32,solana.y-64,32,32)
+    constructor(scene,x,y,w,h) {
+        this.scene = scene;
+        this.active = true;
+        let shapeObject = this.scene.add.rectangle(x + (w / 2), y + (h / 2),w, h);
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter;
+        //this.blobObj = this.scene.matter.add.gameObject(shapeObject, { shape: { type: 'rectangle', flagInternal: true },isSensor: false }); 
+        const mainBody =  Bodies.rectangle(0,0,w,h);
+        this.sensors = {
+            top: Bodies.rectangle(0, -h*0.60, w*0.80, 6, { isSensor: true, friction: 0.0,density: 0.0001,label:"SENSOR_TOP"}), 
+            bottom: Bodies.rectangle(0, h*0.60, w*0.80, 6, { isSensor: true, friction: 0.0,density: 0.0001,label:"SENSOR_BOTTOM"}),
+            left: Bodies.rectangle(-w*0.60, 0, 6, h*0.80 , { isSensor: true, friction: 0.0,density: 0.0001,label:"SENSOR_LEFT"}),
+            right: Bodies.rectangle(w*0.60, 0, 6, h*0.80 , { isSensor: true, friction: 0.0,density: 0.0001,label:"SENSOR_RIGHT"})
+          };
+
+        const compoundBody = Body.create({
+            parts: [mainBody,this.sensors.top,this.sensors.bottom,this.sensors.left,this.sensors.right],
+            frictionStatic: 0.01,
+            frictionAir: 0.05,
+            friction: 0.9,
+            density: 0.01,
+            restitution: 0.7,
+            label: "BLOB"
+        });
+
+        this.blobObj = this.scene.matter.add.gameObject(shapeObject, compoundBody);        
+        this.blobObj.setCollisionCategory(CATEGORY.ENEMY);
+        this.blobObj.setCollidesWith([CATEGORY.GROUND]);
+        this.blobObj.setPosition(x,y);
+
+        this.subblobs = [];
+        for(let i=0;i<16;i++){
+
+            this.subblobs.push(new BlobCBit(scene,x-w/2+(i*8),y, this));
+        }
+        this.attractForce = 0.0010;
+        this.spawnTracker  = {c:0,max:300};
+        this.scene.events.on("update", this.update, this);        
+        this.scene.events.on("shutdown", this.remove, this);
+        this.moveTimer = this.scene.time.addEvent({ delay: 1500, callback: this.hunt, callbackScope: this, loop: false });
+        this.wanderDirection = -1;
+        this.blobObj.touching = {top:0,left:0,bottom:0,right:0};
+        //Sensor Collision Checking
+        this.scene.matter.world.on('beforeupdate', function (event) {
+            this.blobObj.touching.left = 0;
+            this.blobObj.touching.right = 0;
+            this.blobObj.touching.up = 0;
+            this.blobObj.touching.down = 0;    
+        },this);
+        this.scene.matterCollision.addOnCollideActive({
+            objectA: [this.sensors.left,this.sensors.right],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                if (gameObjectB !== undefined && 
+                    (gameObjectB instanceof Phaser.GameObjects.Rectangle
+                    || gameObjectB instanceof Phaser.GameObjects.Ellipse
+                    || gameObjectB instanceof Phaser.GameObjects.Polygon)) {
+                    if (bodyB.label == 'GROUND'){
+                        if(bodyA.label == "SENSOR_RIGHT"){
+                            gameObjectA.touching.right++;
+                        }
+                        if(bodyA.label == "SENSOR_LEFT"){
+                            gameObjectA.touching.left++;
+                            
+                        }
+                    }                
+                  }
+            }
+        });
+    }
+    update(time,delta){
+        if(this.active){
+            for(let i=0;i<this.subblobs.length;i++){
+                let bit = this.subblobs[i];
+                let attrMod = this.attractForce*(this.subblobs.length/12);
+                let targObj = this.blobObj;
+                if(bit.isClung){
+                    targObj = bit.attachedTo;
+                    attrMod = this.attractForce;
+                }
+                let fAng = Phaser.Math.Angle.Between(bit.x,bit.y,targObj.x,targObj.y);
+                bit.applyForce({x:Math.cos(fAng)*attrMod,y:Math.sin(fAng)*attrMod});
+            }
+            
+            if(this.spawnTracker.c >= this.spawnTracker.max){
+                this.spawnTracker.c = 0;
+                if(this.subblobs.length < 16){
+                    this.subblobs.push(new BlobCBit(this.scene,this.blobObj.x-this.blobObj.width/2,this.blobObj.y, this));
+                }
+            }else{
+                this.spawnTracker.c++;
+            }
+        }
+
+    }
+    remove(){
+        this.active = false;
+        this.moveTimer.remove();
+        this.scene.matterCollision.addOnCollideActive({
+            objectA: [this.sensors.left,this.sensors.right],
+            callback: eventData => {}
+        })
+        this.blobObj.destroy();
+    }
+    hunt(){
+        let huntdelay = 1500;
+        if(this.canSee(solana)){
+            if(solana.x < this.blobObj.x){
+                this.wanderDirection = -1;
+            }else if(solana.x > this.blobObj.x){
+                this.wanderDirection = 1;
+            }
+            huntdelay = distanceBetweenObjects(solana,this.blobObj) > 256 ? 1000: 750;
+        }
+        let queryX = this.blobObj.x+(this.wanderDirection*this.blobObj.width);
+        let rayTo = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:queryX,y:this.blobObj.y},{x:queryX,y:this.blobObj.y+32});
+        if(rayTo.length == 0){
+            //Flip wander because of pitfall
+            this.wanderDirection=this.wanderDirection*-1
+        }else if(this.blobObj.touching.left > 0){
+            this.wanderDirection = 1;
+        }else if(this.blobObj.touching.right > 0){
+            this.wanderDirection = -1;
+        }
+
+        this.blobObj.applyForce({x:this.wanderDirection*0.008,y:-0.015})
+        this.moveTimer = this.scene.time.addEvent({ delay: huntdelay, callback: this.hunt, callbackScope: this, loop: false });
+    }
+    canSee(target){
+        let rayTo = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:this.blobObj.x,y:this.blobObj.y},{x:target.x,y:target.y});
+        if(rayTo.length < 1){
+            return true;
+        }else{
+            return false;
+        }
+        
+    }
+    killblobbit(){
+        for( var i = 0; i < this.subblobs.length; i++){ if ( this.subblobs[i].alive === false) { this.subblobs.splice(i, 1); i--; }};
+        
+        if(this.subblobs.length == 0){
+            this.remove();
+        }
+    }
+}
+class BlobCBit extends Phaser.Physics.Matter.Sprite{
+    constructor(scene,x,y, blob) {
+        super(scene.matter.world, x, y, 'oilblob2', 0)
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+
+        this.setActive(true);
+        this.blob = blob;
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        //const mainBody =  Bodies.circle(0,0,w*.50);
+        const mainBody =  Bodies.polygon(0,0,32,w*.25);
+
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0.01,
+            frictionAir: 0.05,
+            friction: 0.9,
+            density: 0.01,
+            restitution: 0.7,
+            label: "BLOBBIT"
+        });
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setFixedRotation()
+        .setPosition(x, y) 
+        .setDensity(0.01)
+        .setDepth(DEPTH_LAYERS.OBJECTS);
+
+        this.scene.matterCollision.addOnCollideStart({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                if (gameObjectB !== undefined && gameObjectB instanceof SoulTransfer) {
+                        gameObjectA.death();
+                        gameObjectB.burn();
+                }
+                if (gameObjectB !== undefined && gameObjectB instanceof Solana) {
+                    gameObjectB.receiveDamage(1);
+                    gameObjectA.attach(gameObjectB);
+                }
+            }
+        });
+        
+        this.alive = true;
+        this.attachedTo = blob.blobObj;
+        this.isClung = false;//Clinging to Solana or Dark? Used for the attraction modifier.
+        this.isSplooshing = false;
+        
+        this.scene.events.on("update", this.update, this);        
+        this.scene.events.on("shutdown", this.death, this);
+    }
+    update(time,delta){
+        if(!this.isSplooshing && this.alive){
+            if(distanceBetweenObjects(this,this.attachedTo) > 256){
+                this.sploosh();
+            }
+        }
+    }
+    sploosh(){
+        this.setRotation(0);
+        this.setVelocityX(0);
+        this.isSplooshing = true;
+        let twSploosh = this.scene.tweens.add({
+            targets: this,
+            scaleY: 0.2,               
+            ease: 'Linear',       
+            duration: 500,  
+            onComplete: function(tween, targets, blobit){blobit.death();},
+            onCompleteParams: [this],
+        });
+
+    }
+    attach(target){
+        this.attachedTo = target;
+        this.isClung = true;        
+    }
+    death(){
+        //When this orb dies, it is spliced out of the parent blob's array.
+        this.alive = false;
+        this.blob.killblobbit();
+        this.destroy();
+
+    }
+}
+class EnemyShrieker extends Phaser.Physics.Matter.Sprite{
+    //Shriekers emit a high pitch sound wave that throws the players away. They shrink and hide if his by a light burst, solbomb or or if bright gets close enough.
+    //The sound wave // ripple comes out quick and throws the player based on the angle they are to the shrieker. Solana and Dark will both take damage and be tossed.
+
+    constructor(scene,x,y) {
+        super(scene.matter.world, x, y, 'shrieker', 0)
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+
+        this.setActive(true);
+
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        //const mainBody =  Bodies.circle(0,0,w*.50);
+        const mainBody =  Bodies.rectangle(0,0,w*0.95,h*0.90, {chamfer: {radius: 10}});
+
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0.01,
+            frictionAir: 0.05,
+            friction: 0.9,
+            density: 0.01,
+            restitution: 0.7,
+            label: "SHRIEKER"
+        });
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setPosition(x, y) 
+        .setDensity(0.01)
+        .setDepth(DEPTH_LAYERS.OBJECTS);
+
+        this.setStatic(true);
+        this.screamTimer = this.scene.time.addEvent({ delay: 1100, callback: this.scream, callbackScope: this, loop: true });
+        this.screamPower = 0.010;
+        //Need stronger power if above within a 90 degree space. Otherwise lower it to 0.01 to smooth out the push effect.
+        this.animScream = [0,1,2];
+        this.animShrivel = [3,4,5,6,7,8,9,10];
+        this.canScream = true;
+        this.screamCircle = this.scene.add.ellipse(this.x,this.y,this.width,this.height,0x0000DD,0.3);
+        this.screamCircle.blendMode = Phaser.BlendModes.ADD;
+        this.screamCircle.isStroked = true;
+        this.screamCircle.strokeColor = 0xFFFFFF;
+        this.screamCircle.strokeAlpha = 0.5;
+        this.screamCircle.lineWidth = 1;
+        this.screamCircle.setVisible(false);
+        //Collision
+        this.scene.matterCollision.addOnCollideStart({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Bright) {
+                    if(gameObjectB.light_status == 0){
+                        gameObjectA.shrivel();
+                    }
+                }
+                if(gameObjectB !== undefined && gameObjectB instanceof SoulTransfer){
+                    gameObjectA.shrivel();
+                    gameObjectB.burn();
+                }
+            }
+        });
+    }
+    scream(){
+        if(this.canScream){
+            let disSolana = distanceBetweenObjects(solana,this);
+            let disBright = bright.light_status == 0 ? distanceBetweenObjects(bright,this) : 9999;
+            if(disSolana < 128 || disBright < 128){
+                this.anims.play('shrieker-shriek',true);
+                this.screamCircle.setVisible(true);
+                let tween = this.scene.tweens.add({
+                    targets: this.screamCircle,
+                    scale: 5.0,               
+                    ease: 'Linear',       
+                    duration: 1000,  
+                    onComplete: function(tween, targets, shroom){shroom.screamCircle.setScale(1.0);shroom.screamCircle.setVisible(false);shroom.setFrame(0)},
+                    onUpdate: function(tween,targets, shroom){
+                        if(Phaser.Math.Distance.Between(shroom.x,shroom.y,solana.x,solana.y) < (shroom.screamCircle.displayWidth)/2){
+                            let a = Phaser.Math.Angle.Between(shroom.x,shroom.y,solana.x,solana.y);
+                            let adeg = Phaser.Math.RadToDeg(a);
+                            let pow = shroom.screamPower;
+                            if(adeg > -135 && adeg < -45){pow = pow*5;}
+                            solana.applyForce({x:Math.cos(a)*pow,y:Math.sin(a)*pow});
+                        }
+                    },
+                    onUpdateParams: [this],
+                    onCompleteParams: [this],
+                });
+            }   
+        }
+    }
+    shrivel(){
+        if(this.canScream){
+            this.canScream = false;
+            this.screamTimer.paused = true;
+            this.disableScreamTimer = this.scene.time.addEvent({ delay: 4000, callback: this.unshrivel, callbackScope: this, loop: false });
+            this.anims.play('shrieker-shrivel',true);
+        }else{
+            this.disableScreamTimer.reset({ delay: 4000, callback: this.unshrivel, callbackScope: this, loop: false });
+        }
+
+    }
+    unshrivel(){
+        this.screamTimer.paused = false;
+        this.canScream = true;
+        this.anims.playReverse('shrieker-shrivel',true);
+    }
+}
+
+class EnemySpiker {
+    constructor(scene,x,y,angle){
+        this.scene = scene;
+        //base
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules   
+        this.base = this.scene.matter.add.image(x, y-16, 'spiker', 2, { shape: {type:'rectangle',width:16,height:16}, chamfer: { radius: 5 }, mass: 200, restitution: 0.0, friction: 0.5, frictionAir: 0.5 });
+        this.base.setStatic(true);
+        //Arm
+        this.armsegements = [];
+        for(let s=0;s<4;s++){
+            let newSeg = this.scene.matter.add.image(x, y-48-(s*12), 'spiker', 3, { shape: {type:'rectangle',width:12,height:12}, chamfer: { radius: 2 }, mass: 0.3, restitution: 0.0, friction: 0.9, frictionAir: 0.03 });
+            //newSeg.setCollidesWith([0]);
+            if(s == 0){
+                this.scene.matter.add.joint(this.base,newSeg, 2, 1,{
+                    pointA: { x: 0, y: (-9) },
+                    pointB: { x: 0, y: (6) },
+                });
+            }else{
+                this.scene.matter.add.joint(this.armsegements[s-1],newSeg, 2, 1,{
+                    pointA: { x: 0, y: (-6) },
+                    pointB: { x: 0, y: (6) },
+                });
+            }
+            this.armsegements.push(newSeg);
+        }
+        //Stinger
+        this.stinger = this.scene.matter.add.image(x, y-48-(this.armsegements.length*12), 'spiker', 0, { shape: {type:'circle', radius: 8} , label: "ENEMY_STINGER",mass: 0.3, restitution: 0.0, friction: 0.5, frictionAir: 0.03 });
+        this.scene.matter.add.joint(this.armsegements[this.armsegements.length-1],this.stinger, 8, 0.4,{
+            pointA: { x: 0, y: (-6) },
+            pointB: { x: 0, y: 4 },
+        });
+        
+        this.scene.events.on("update", this.update, this);        
+        this.scene.events.on("shutdown", this.remove, this);
+        this.active = true;
+        this.stingerForce = 0.0008;
+        //Attack timer -Make the attack look correct.
+        this.attackTimer = {c:0,f:90}
+    }
+    update(time,delta){
+        if(this.active){
+            let target = solana;
+            let solDis = distanceBetweenObjects(solana,this.stinger);
+            if(solDis < 128){
+                let angToPlayer = Phaser.Math.Angle.Between(this.stinger.x,this.stinger.y,target.x,target.y);
+                this.stinger.setRotation(angToPlayer+(Math.PI/4));
+                let curForce = this.stingerForce;
+                if(this.attackTimer.c >= this.attackTimer.f){
+                    curForce = 0.10;
+                    this.attackTimer.c = 0;
+                }
+                this.stinger.applyForce({x:Math.cos(angToPlayer)*curForce,y:Math.sin(angToPlayer)*curForce});
+                
+                this.attackTimer.c++;
+            }else{
+                this.attackTimer.c = 0;
+            }
+        }
+    } 
+    shrink(){
+        this.armsegements.forEach(e=>{
+            e.setCollidesWith([CATEGORY.SOLID])
+        })
+        let tween = this.scene.tweens.add({
+            targets: this.base,
+            y: this.base.y+64,               
+            ease: 'Linear',       
+            duration: 1000, 
+        });
+        
+
+    }
+    grow(){
+        this.armsegements.forEach(e=>{
+            e.setCollidesWith([1])
+        })
+        let tween = this.scene.tweens.add({
+            targets: this.base,
+            y: this.base.y-64,               
+            ease: 'Linear',       
+            duration: 1000, 
+        });
+    }
+    remove(){
+        this.active = false;
+        this.base.destroy();
+        this.armsegements.forEach(e=>{
+            e.destroy();
+        });        
+        this.stinger.destroy();
     }
 }
