@@ -20,9 +20,9 @@ class HudScene extends Phaser.Scene {
 
             let debugString =  "CamX:"+String(Math.round(camera_main.worldView.x))
             +"\nCamY:" + String(Math.round(camera_main.worldView.y))
-            +"\nPlayerMode:" + String(playerMode)
+            +"\nZoomMode:" + String(playScene.cameraLevel)
             +"\nKeyPress_X:" + String(this.skipSpeech.isDown)
-            +"\nDisPlayers:"+String(disPlayers)+":"+String(disPlayersX.toFixed(0))+":"+String(disPlayersY.toFixed(0));
+            +"\nDisPlayers:"+String(disPlayers)+":"+String(disPlayersX << 0)+":"+String(disPlayersY << 0);
             this.debug.setText(debugString);
 
             this.shard_data_l.setText(this.shard_totals.light+" x");
@@ -32,6 +32,10 @@ class HudScene extends Phaser.Scene {
             //Controller Update
             updateGamePads();
             keyPad.updateKeyState();
+
+            //UpdateStatBars
+            this.brightStatBar.updateBar();
+            this.solanaStatBar.updateBar()
         }
     }
     setReady(){
@@ -89,12 +93,12 @@ class HudScene extends Phaser.Scene {
             this.setBossVisible(false);
 
             //Statbar Solana
-            this.solanaStatBar = new Statbar(this,this.cameras.main.width/4, 36, 'hud_energybar3',0,1,2,500,500,false,
+            this.solanaStatBar = new Statbar(this,this.cameras.main.width/4, 36, 'hud_energybar3',0,1,2,1500,1500,true,
             { fontSize: '22px', fill: '#FFFFFF', stroke: '#000000', strokeThickness: 4 },
             {dir: 'LR',tintPercent: 0.20, tintColor: 0xFFB6B6})
             this.solanaStatBarHead = this.add.image(this.cameras.main.width/4-96, 36, 'hud_energybar3_solana_head',0).setScale(2).setOrigin(0.5);
 
-            this.brightStatBar = new Statbar(this,this.cameras.main.width*(3/4), 36, 'hud_energybar3',0,1,2,500,500,false,
+            this.brightStatBar = new Statbar(this,this.cameras.main.width*(3/4), 36, 'hud_energybar3',0,1,2,5000,5000,true,
             { fontSize: '22px', fill: '#FFFFFF', stroke: '#000000', strokeThickness: 4 },
             {dir: 'RL',tintPercent: 0.20, tintColor: 0xFFB6B6})
             this.brightStatBarHead = this.add.image(this.cameras.main.width*(3/4)+96, 36, 'hud_energybar3_bright_head',0).setScale(2).setOrigin(0.5);
@@ -167,6 +171,9 @@ class HudScene extends Phaser.Scene {
     }
     alterEnergySolana(energyChange){
         this.solanaStatBar.alterValue(energyChange);
+        if(this.solanaStatBar.getValue() <= 0){
+            solana.receiveDamage(1);
+        }
 
     }
     alterEnergyBright(energyChange){
@@ -414,7 +421,8 @@ class HudSpeech{
         //Allow the speach item to be skipped if a button is pressed.
         if(hs.scene.skipSpeech.isDown && tween.progress < 0.90){
             //console.log("skip attempted");
-            tween.seek(0.90);
+            //tween.seek(0.90);
+            tween.nextState();
             hs.speaktext.setText("");
             hs.endSpeech(hs);
         }

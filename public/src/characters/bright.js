@@ -15,7 +15,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
           parts: [mainBody],
           frictionStatic: 0.3,
           frictionAir: 0.3,
-          friction: 0.3,
+          friction: 0.9,
           restitution: 0.00,
           density: 0.05,
           label: "BRIGHT"
@@ -29,7 +29,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y)
         .setIgnoreGravity(true);
         
-        this.bg = this.scene.add.image(x,y,'bright',0).setVisible(false);
+        this.setDepth(DEPTH_LAYERS.PLAYERS);
+        this.bg = this.scene.add.image(x,y,'bright',0).setVisible(false).setDepth(this.depth-1);
         this.scene.tweens.add({
             targets: this.bg,
             rotation: (Math.PI*2),              
@@ -41,22 +42,27 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
         //Sensors
         this.sensor = new BrightSensors(scene,x,y);
+        
 
-
+        console.log("Brights's mass",this.body.mass);
         //Custom properties
         this.light_status = 0;//0 - Bright, 1 - Dark;
         this.hp = 5;
         this.max_hp = 5;
+        this.energyChange = 0;
         this.mv_speed = 3;
         this.roll_speed = 0.400;
-        this.jump_speed = 0.020;
+        this.jump_speed = 0.016;
         this.max_speed = {air:10,ground:10};
         this.alive = true;
         this.invuln = false;
         this.falling = false;
         this.debug = this.scene.add.text(this.x, this.y-16, 'bright', { resolution: 2, fontSize: '10px', fill: '#00FF00' });
         this.touching = {up:0,down:0,left:0,right:0};
-        this.airTime = 0;//For Camera Shake
+        this.onGround = false;
+        this.jumpCount = 0;
+        this.jumpCountPrev = 0;
+        this.airTime = 40;//For Camera Shake
         this.light_radius = 75;
         //Dialogue    
         this.dialogue = new Dialogue(this.scene,[{speaker:this,ttl:0,text:""}],54,-40);  
@@ -89,25 +95,29 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.controller;
         this.ctrlDevice;
         this.ctrlDeviceId = -1;
+
     }
 
     update()
     {
-            this.bg.setPosition(this.x,this.y);
-            if(this.alive){
+        this.bg.setPosition(this.x,this.y);
+        if(this.alive){
                 this.effect[0].emitters.list[0].setPosition(this.x,this.y);
                 this.sensor.setPosition(this.x,this.y);
+                this.sensor.update();
                 if(this.dialogue.isRunning){
                     this.dialogue.update();
                 }
-                //REMOVE WALL JUMPING by allowing on a jump when touching down
-                //if(this.touching.up==0 && this.touching.down == 0 && this.touching.left == 0 && this.touching.right == 0){
-                if(this.touching.down == 0){
-                    this.airTime++;
-                }else{
+
+                if(this.touching.down > 0){
+                    this.onGround = true;
                     this.airTime=0;
                     this.slamReady = true;
-                };
+                }else{
+                    this.onGround = false;
+                    this.airTime++;
+                }
+                
                 if(this.abPulse.doCharge){
                     this.pulseUpdate();
                     
@@ -140,7 +150,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             let brightMode = 0;
             //Drain Energy since not bright
             if(this.light_status == darkMode){
-                hud.alterEnergyBright(-0.5);
+                this.addEnergy(-1);
                 if(hud.brightStatBar.getValue() <= 0){this.receiveDamage(1);};
             };
             //This creates a wobble of contention for add and remove values on different update loops.
@@ -159,7 +169,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 let control_pulsePress = this.getControllerAction('pulse');
                 let control_pulseRelease = this.getControllerAction('pulseR');
                 let control_change = this.getControllerAction('changeplayer');
-                let control_dash = this.getControllerAction('dash');
+                let control_dash = this.getControllerAction('dash');  
+                let control_jumphold = this.getControllerAction('jumphold');
                 
                 //Change Player in Single Mode
                 if(playerMode == 0){
@@ -168,6 +179,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     } 
                 }
                 if(this.light_status == brightMode){
+                    this.angle = 0;
                     //BRIGHT CONTROLS 
                     if(control_beam && this.beamReady ){
                         this.beamReady = false;
@@ -199,7 +211,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     }
 
                     //Passing Soulight
-                    if (control_passPress && soullight.ownerid == 1) {        
+                    if (control_passPress && soullight.ownerid == 1 && !this.abPulse.doCharge) {        
                         let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:soullight.x,y:soullight.y});                  
                         if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) > soullight.freePassDistance){                                
                             soullight.aimStart() 
@@ -253,25 +265,30 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 }else{
                     //DARK CONTROLS
                     if (control_left) {          
-                        this.sprite.setAngularVelocity(-this.roll_speed);   
-                        //this.applyForce({x:-this.roll_speed/50,y:0});          
+                        this.sprite.setAngularVelocity(-this.roll_speed);           
                         this.sprite.anims.play('dark-idle', true);
-
-                        if(this.airTime > 0 && this.airTime < 3){
-                            this.sprite.setVelocityX(-this.mv_speed); 
+                        if(!this.onGround &&  this.touching.left == 0){
+                            if(this.body.velocity.x > -4){
+                                let airVelX = 0.0010;
+                                if(this.body.velocity.x > 0){
+                                    airVelX = 0.0020;
+                                }
+                                this.sprite.applyForce({x:-airVelX,y:0}) 
+                            }
                         }
-
-
                     }
                     if (control_right) {     
-                        this.sprite.setAngularVelocity(this.roll_speed);  
-                        //this.applyForce({x:this.roll_speed/50,y:0});                  
-
+                        this.sprite.setAngularVelocity(this.roll_speed); 
                         this.sprite.anims.play('dark-idle', true);
-                        if(this.airTime > 0 && this.airTime < 3){
-                            this.sprite.setVelocityX(this.mv_speed); 
-                        }                 
-
+                        if(!this.onGround && this.touching.right == 0){
+                            if(this.body.velocity.x < 4){                                
+                                let airVelX = 0.0010;
+                                if(this.body.velocity.x < 0){
+                                    airVelX = 0.0020;
+                                }
+                                this.sprite.applyForce({x:airVelX,y:0}) 
+                            }
+                        }  
                     }
                     if(!control_left && !control_right){
                         this.sprite.anims.play('dark-idle', true);//Idle
@@ -290,9 +307,15 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     //Dark Stop
                     if (control_down && this.airTime == 0) {
                         let angVel = this.body.angularVelocity;
-                        if(angVel > 0){this.setAngularVelocity(angVel-.05)};
-                        if(angVel < 0){this.setAngularVelocity(angVel+.05)};
-                        if(angVel < .10 && angVel > -.10){this.setAngularVelocity(0)};
+                        // if(angVel > 0){this.setAngularVelocity(angVel-.05)};
+                        // if(angVel < 0){this.setAngularVelocity(angVel+.05)};
+                        // if(angVel < .10 && angVel > -.10){this.setAngularVelocity(0)};
+                        this.setAngularVelocity(0);
+                        let bVelX = this.body.velocity.x;
+                        if(bVelX > 0){this.setVelocityX(bVelX-.10)};
+                        if(bVelX < 0){this.setVelocityX(bVelX+.10)};
+                        if(bVelX < .10 && bVelX > -.10){this.setVelocityX(0)};
+                        
                         //Kick up dust
                         if(this.body.velocity.x > 1 || this.body.velocity.x < -1){
                             let pQ = Math.round(Math.abs(this.body.velocity.x));
@@ -309,10 +332,12 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                         // him to break thru multiple objects cleanly.
                     }
                     //Dark Jump
-                    if(control_jump && this.airTime <=  10){
+                    if(control_jump && this.onGround){
                         this.sprite.applyForce({x:0,y:-this.jump_speed});
                     }
-
+                    if(control_jumphold && this.body.velocity.y < 0){
+                        this.applyForce({x:0,y:-this.jump_speed*0.025});
+                    }
                     //Singularity
                     if(control_pulsePress){
                         let solAngle = Phaser.Math.Angle.Between(this.x,this.y,solana.x,solana.y);
@@ -320,11 +345,17 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                         let solPullVec = {x:-Math.cos(solAngle)*solForce,y:-Math.sin(solAngle)*solForce};
                         solana.applyForce(solPullVec);
                     }
+
+                    //Fake Angular Velocity friction
+                    let angVelCk = this.body.angularVelocity;
+                    if(angVelCk > 0){this.body.angularVelocity-=0.05;};
+                    if(angVelCk < 0){this.body.angularVelocity+=0.05;};
+                    if(angVelCk < .10 && angVelCk > -.10){this.body.angularVelocity = 0};
                 }
 
                
                 //Max Velocities
-                if(this.airTime >  0){        
+                if(this.airTime > 0){        
                     if(this.body.velocity.x > this.max_speed.air ){this.setVelocityX(this.max_speed.air);};
                     if(this.body.velocity.x < -this.max_speed.air ){this.setVelocityX(-this.max_speed.air );};
                     if(this.body.velocity.y > this.max_speed.air ){this.setVelocityY(this.max_speed.air);};
@@ -338,7 +369,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 }
 
                 // this.debug.setPosition(this.sprite.x, this.sprite.y-64);
-                // this.debug.setText("Pulse Power:"+String(this.abPulse.c));
+                // this.debug.setText("JumpCount:"+String(this.jumpCount)+":"+String(this.touching.down));
             }else if(curr_player==players.SOLANA && playerMode == 0){
                 //Allow Single Player Follow Mode
                 if(this.followMode){
@@ -356,8 +387,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     }
                 }
             }
+            this.resetEnergy();
         }
-
     }    
     getControllerAction(action){
         if(this.ctrlDeviceId >=0){
@@ -372,6 +403,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     return (gamePad[this.ctrlDeviceId].getStickLeft(.5).x > 0);
                 case 'jump':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('A') == 1);
+                case 'jumphold':
+                    return (gamePad[this.ctrlDeviceId].checkButtonState('A') > 1);
                 case 'beam':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('X') == 1);
                 case 'pass':
@@ -401,6 +434,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     return (keyPad.checkKeyState('D') > 0);
                 case 'jump':
                     return (keyPad.checkKeyState('SPC') == 1);
+                case 'jumphold':
+                    return (keyPad.checkKeyState('SPC') > 1);
                 case 'beam':
                     return (keyPad.checkMouseState('MB0') > 0);
                 case 'grab':
@@ -443,6 +478,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.sprite.anims.play('dark-idle', false);
         this.sprite.setIgnoreGravity(false);
         this.sprite.setCollisionCategory(CATEGORY.DARK);
+        this.sensor.setCollisionCategory(CATEGORY.DARK);
         this.sprite.setDensity(0.01);//0.01
         this.bg.setVisible(false);
     }
@@ -453,6 +489,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.sprite.anims.play('bright-idle', false);
         this.sprite.setIgnoreGravity(true);
         this.sprite.setCollisionCategory(CATEGORY.BRIGHT);
+        this.sensor.setCollisionCategory(CATEGORY.BRIGHT);
         this.sprite.setDensity(0.01);
         this.bg.setVisible(true);
         //Tween back to straight up
@@ -488,7 +525,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             this.hp = 5;
             hud.setHealth(this.hp,1);
             this.alive = true; 
-            hud.alterEnergyBright(500);
+            this.addEnergy(5000);
             if(soullight.ownerid == 1){
                 soullight.passLight();
             }
@@ -520,7 +557,14 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             this.hp = 5;
          };         
         hud.setHealth(this.hp,1);
-     }
+    }
+    addEnergy(e){
+        this.energyChange+=e;
+    }
+    resetEnergy(){
+        hud.alterEnergyBright(this.energyChange);
+        this.energyChange = 0;
+    }
     pulseCharge(object){
         //Move Solana Off Screen
         object.setControlLock();
@@ -529,9 +573,9 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
         this.abPulse.doCharge = true;
         //As It charges, the max particles and size should increase, making it glow more.
-        this.effect[0].setVisible(true);
+        //this.effect[0].setVisible(true);
         camera_main.flash(500,255,255,255);
-        
+        this.bg.setDepth(this.depth-1);
     }
     pulseUpdate(){
         //Update Solana "Hold"
@@ -548,7 +592,9 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         }
         let aimpoint = this.scene.getCircleAimPoint(this.x,this.y,this.abPulse.circle,targVector.x,targVector.y)    
         //Emit Particles to mark target//Need Different particle style here, THIS IS MASSIVE AND TAKES UP WAAAY too much space.
-        this.effect[0].emitParticleAt(aimpoint.p.x,aimpoint.p.y,5);
+        
+        //this.effect[0].emitParticleAt(aimpoint.p.x,aimpoint.p.y,5);
+
         //Throw Power
         let power =  this.abPulse.c/1000;
         this.abPulse.vec = {x:Math.cos(aimpoint.angle)*(power+power*0.5),y:Math.sin(aimpoint.angle)*power};//50% more power to X velocity
@@ -569,8 +615,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.setFrictionAir(0.25);
         this.jump_speed = 0.055;
         if(this.light_status == 0){
-            soullight.passLight();
-            this.toDark();
+            // soullight.passLight();
+            // this.toDark();
         }
         console.log("Bright Entered water.",this.light_status,this.jump_speed);
     }
@@ -596,7 +642,7 @@ class BrightSensors extends Phaser.Physics.Matter.Sprite{
     
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         const { width: w, height: h } = this.sprite;
-        const mainBody = Bodies.circle(0,0,w*.1);
+        const mainBody = Bodies.circle(0,0,w*.1, {isSensor: true});
 
         this.sensors = {
           bottom: Bodies.rectangle(0, h * 0.12, w * 0.16, 2, { isSensor: true }),
@@ -620,16 +666,15 @@ class BrightSensors extends Phaser.Physics.Matter.Sprite{
         });
         this.sprite
         .setExistingBody(compoundBody)          
-        .setCollisionCategory(CATEGORY.BRIGHT)
+        .setCollisionCategory(CATEGORY.DARK)
         .setCollidesWith([ CATEGORY.GROUND,CATEGORY.SOLID, CATEGORY.BARRIER, CATEGORY.VEHICLE, CATEGORY.ENEMY ])
-        .setScale(1.0)
         .setFixedRotation() 
         .setPosition(x, y)
         .setIgnoreGravity(true)
         .setVisible(false);
 
- 
-
+        this.touching = {up:0,down:0,left:0,right:0};
+      
     }
     update(time, delta)
     {       

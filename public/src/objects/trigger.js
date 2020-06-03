@@ -13,7 +13,7 @@
 class TMXLever extends Phaser.Physics.Matter.Sprite{
     constructor(scene,x,y) {
         super(scene.matter.world, x, y, 'lever', 0)
-        this.scene = config.scene;
+        this.scene = scene;
         // Create the physics-based sprite that we will move around and animate
         scene.matter.world.add(this);
         // config.scene.sys.displayList.add(this);
@@ -41,7 +41,7 @@ class TMXLever extends Phaser.Physics.Matter.Sprite{
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setIgnoreGravity(true);    
 
-        this.debug = scene.add.text(this.x, this.y-16, 'Lever', { fontSize: '10px', fill: '#00FF00' });             
+        this.debug = scene.add.text(this.x, this.y-16, 'Lever', { fontSize: '10px', fill: '#00FF00' }).setDepth(this.depth+1);             
 
 
     }
@@ -139,7 +139,8 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
             frictionAir: 0.02,
             friction: 0.1
         });
-
+        compoundBody.render.sprite.xOffset = 0.50;
+        compoundBody.render.sprite.yOffset = 0.50;
         this.sprite
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.BARRIER)
@@ -148,19 +149,22 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
         .setStatic(true)
         .setIgnoreGravity(true);    
 
-        this.debug = scene.add.text(this.x, this.y-16, 'gate', { fontSize: '10px', fill: '#00FF00' });             
+        this.debug = scene.add.text(this.x, this.y-16, 'gate', { fontSize: '10px', fill: '#00FF00' }).setDepth(this.depth+1);             
 
 
     }
-    setup(x,y,properties,name){
-        this.setActive(true);
-        
-        this.setPosition(x,y);
+    setup(x,y,properties,name,w,h){
+        this.setActive(true);        
+        this.setPosition(x,y);        
+        this.setSize(w,h);
+        this.setDisplaySize(w,h);
         this.name = name;        
         this.ready = true;
         this.prevVel = {x:0,y:0};       
         this.mvdir = JSON.parse(properties.mvdir)
         this.isClosed = true;
+        this.twDuration = properties.duration == undefined ? 3000 : properties.duration;
+        this.twCompleteDelay = properties.completedelay == undefined ? 0 : properties.completedelay;
         this.closedPos = {x:x,y:y};
         this.openPos = {x:x+this.mvdir.x,y:y+this.mvdir.y}
         this.autoClose = properties.autoclose == undefined ? false : properties.autoclose;
@@ -196,7 +200,8 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
                     x: this.openPos.x,
                     y: this.openPos.y,
                     ease: 'Power1',
-                    duration: 3000,
+                    duration: this.twDuration,
+                    completeDelay: this.twCompleteDelay,
                     onComplete: this.openComplete,
                     onCompleteParams: [ this, true ]
                 });
@@ -206,7 +211,8 @@ class TMXGate extends Phaser.Physics.Matter.Sprite{
                     x: this.closedPos.x,
                     y: this.closedPos.y,
                     ease: 'Power1',
-                    duration: 3000,
+                    duration: this.twDuration,
+                    completeDelay: this.twCompleteDelay,
                     onComplete: this.openComplete,
                     onCompleteParams: [ this, false ]
                 });
@@ -254,7 +260,7 @@ class TMXPlate extends Phaser.Physics.Matter.Sprite{
         .setStatic(true)
         .setIgnoreGravity(true);    
 
-        this.debug = this.scene.add.text(this.x, this.y-16, 'plate', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5);             
+        this.debug = this.scene.add.text(this.x, this.y-16, 'plate', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5).setDepth(this.depth+1);             
         this.plateSound = this.scene.sound.add('switch1');
 
     }
@@ -362,7 +368,7 @@ class TMXButton extends Phaser.Physics.Matter.Sprite{
         .setStatic(true)
         .setIgnoreGravity(true);    
 
-        this.debug = scene.add.text(this.x, this.y-16, 'TMXButton', { fontSize: '10px', fill: '#00FF00' });             
+        this.debug = scene.add.text(this.x, this.y-16, 'TMXButton', { fontSize: '10px', fill: '#00FF00' }).setDepth(this.depth+1);             
 
 
     }
@@ -458,9 +464,10 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y)
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setStatic(true)
-        .setIgnoreGravity(true);    
-
-        this.debug = scene.add.text(this.x, this.y, 'Zone', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5);             
+        .setIgnoreGravity(true)
+        .setCollisionCategory(CATEGORY.BARRIER);    
+        this.setDepth(DEPTH_LAYERS.PLATFORMS);
+        this.debug = scene.add.text(this.x, this.y, 'Zone', { fontSize: '10px', fill: '#00FF00', resolution: 2, align:"center"}).setOrigin(0.5).setDepth(this.depth+1);             
         
         //Add Matter collisionStart detector on all bodies.
         //When a new collisions starts, check the mass of all bodies in the zone that meet the body label filter. if the zone type is weight,
@@ -484,6 +491,7 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
         this.zoneHeight = h;  
         this.totalBodies = [];
         this.massThrehold = 100;
+        this.enabled = true;
         //Zones can do certain things.
         //
         if(properties){
@@ -504,13 +512,30 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
         //Teleport: Teleports the player via transform
        //console.log("setup",name, properties,this.target);
        if(this.zonedata.type == "force"){
-            //Apply Wind Animation if wind
-            //Rotate direction to match x/y vector
-            this.sprite.anims.play('wind-1', true);
-            let vectorParse = JSON.parse(this.zonedata.value);
-            //var rad = Math.atan2(vectorParse.x, vectorParse.y);
-            //this.setRotation(rad);
-            if(vectorParse.x < 0){this.sprite.flipX  = true;};
+            let vectorParse = JSON.parse(this.zonedata.value);   //Use this to get angle
+            let v2ang = Phaser.Math.Angle.Between(0,0,vectorParse.x,vectorParse.y);
+            let wind1 = this.scene.add.particles('shapes');
+            this.wind1 = wind1.createEmitter({
+                active:true,
+                x: this.x,
+                y: this.y,
+                frame: {
+                    frames: [
+                        "trace_06"
+                    ],
+                    cycle: false,
+                    quantity: 1
+                },
+                speed: 100,
+                angle: Phaser.Math.RadToDeg(v2ang),
+                alpha: { start: 0.2, end: 0 },
+                blendMode: 'NORMAL',
+                emitZone: {
+                    source: new Phaser.Geom.Rectangle(-w/2,-h/2,w,h),
+                    type: "random"
+                }
+            });
+
        }else if(this.zonedata.type == "teleport"){
             this.effect=[
                 this.scene.add.particles('shapes',  new Function('return ' + this.scene.cache.text.get('effect-trigger-teleporter'))())
@@ -576,6 +601,10 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
             });
         }else if(this.zonedata.type == 'hurt'){
             let spark1 = this.scene.add.particles('shapes');
+            spark1.setDepth(DEPTH_LAYERS.FRONT);
+            let hurtParse = JSON.parse(this.zonedata.value);
+            let gravY = hurtParse.gravY != undefined ? hurtParse.gravY : 0;
+            let gravX = hurtParse.gravX != undefined ? hurtParse.gravX : 0;
             this.sparker = spark1.createEmitter({
                 active:true,
                 x: this.x,
@@ -587,33 +616,94 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
                     cycle: false,
                     quantity: 1
                 },
-                gravityY: -100,
+                gravityY: gravY,
+                gravityX: gravX,
                 scale: { start: 0.5, end: 0.0 },
                 alpha: { start: 1, end: 0 },
-                blendMode: 'ADD',
+                blendMode: 'NORMAL',
                 tint: [
                     4263489
                 ],
                 emitZone: {
-                    source: new Phaser.Geom.Rectangle(-w/2,0,w,0),
+                    source: new Phaser.Geom.Rectangle(-w/2,-h/2,w,h),
                     type: "random"
                 }
             });
-       }
+       }else if(this.zonedata.type == 'liquid'){
+            
+            this.scene.time.addEvent({ delay: 1000, callback: function(){
+                
+                let d = liquiddrops.get(x+Phaser.Math.Between(-w/2,w/2),y);
+                d.id = debug_drop_cout;
+                debug_drop_cout++;
+            }, callbackScope: this, loop: true });
+       }else if(this.zonedata.type == 'climb'){
+        //Restrict collision types
+            this.setCollidesWith([CATEGORY.SOLANA]);
+        
+        //Add Collision Listener to track mass of all active collisions
+            this.scene.matterCollision.addOnCollideStart({
+                objectA: [this],
+                objectB: [solana.mainBody],
+                callback: eventData => {
+                    const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;                    
+                    if(gameObjectB !== undefined && gameObjectB instanceof Solana){
+                        gameObjectB.setIgnoreGravity(true);
+                        gameObjectB.isClimbing = true;                        
+                        if(gameObjectB.body.velocity.y != 0){gameObjectB.setVelocityY(0);}
+                        
+                    }
+                }
+            });
+            this.scene.matterCollision.addOnCollideEnd({
+                objectA: [this],
+                objectB: [solana.mainBody],
+                callback: eventData => {
+                    const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;                    
+                    if(gameObjectB !== undefined && gameObjectB instanceof Solana){
+                        gameObjectB.setIgnoreGravity(false);
+                        gameObjectB.isClimbing = false;
+                        
+                    }
+                }
+            });
+        }
+     
  
     }
     update(time, delta)
     {       
-        let tMass = 0;
-        if(this.totalBodies.length > 0){
-            tMass = this.totalBodies.sum('mass');
-            if(tMass >= this.massThrehold && this.ready){
-                this.ready = false;
-                this.triggerTarget(0);//Player id does not matter sinze it is mass
+        //For Mass Calculations within  the zone.
+        if(this.zonedata.type == "mass"){
+            let tMass = 0;
+            if(this.totalBodies.length > 0){
+                tMass = this.totalBodies.sum('mass');
+                if(tMass >= this.massThrehold && this.ready){
+                    this.ready = false;
+                    this.triggerTarget(0);//Player id does not matter sinze it is mass
+                }
             }
+        }else  if(this.zonedata.type == "force"){
+        //For Zone force pushing ranges
+        //Raycast along vector of the zone. Use the full size of the zone.
+        //Check for blocking bodies. If a blocking body blocks the 50% of the width of the zone
+        //Stop the airflow and resize. use scale to retain original size information
+
+            // //Test bottom to top
+            // let rayTo = Phaser.Physics.Matter.Matter.Query.ray(this.scene.matter.world.localWorld.bodies,{x:this.x,y:this.y+this.height/2},{x:this.x,y:this.y-this.height/2});
+            // if(rayTo.length < 3){
+            //     //Not Blocked;
+            // }else{
+            //     //Blocked;
+            //     if(this.scaleY > 0.10){
+            //         this.scaleY-=0.10;
+            //     }
+            // }
         }
+
+
         this.debug.setPosition(this.x, this.y-16);
-        this.debug.setText("Zone name:"+String(this.name)+": rState :"+String(this.ready)+": Mass :"+String(tMass)+"/"+String(this.massThrehold));
+        this.debug.setText("Zone name:"+String(this.name)+"\n rState :"+String(this.ready));
     }
     setTarget(targetObject){
         this.target.object.push(targetObject);
@@ -636,10 +726,17 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
         this.ready[playerid]  = true;
     }
     activateTrigger(playerid){
-        this.ready[playerid]  = true;
+        this.ready[playerid] = true;
         if(this.zonedata.type == "teleport"){
-            this.effect[0].setActive(true);
-            this.teleporterGradeient.setVisible(true);
+            this.effect[0].setActive(this.ready[playerid]);
+            this.teleporterGradeient.setVisible(this.ready[playerid]);
+        }else if(this.zonedata.type == "force"){
+            this.enabled = !this.enabled;
+            if(this.enabled){
+                this.wind1.start();
+            }else{
+                this.wind1.stop();
+            };
         }
     }
     useZone(playerid){
@@ -648,7 +745,7 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
     inZone(obj,id){
         //Do something base on zome type
 
-        if(this.ready[id] == true){
+        if(this.ready[id] == true && this.enabled){
             this.ready[id] = false;
             //Solana Specific Functions
             if(id == 0){
@@ -728,8 +825,8 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         const { width: w, height: h } = this.sprite;
         const mainBody =  Bodies.rectangle(0, 0, w, h);
         this.sensors = {
-            top: Bodies.rectangle(0, -h*0.70, w , h*0.60, { isSensor: true }),
-            bottom: Bodies.rectangle(0, h*0.70, w , h*0.60, { isSensor: true })
+            top: Bodies.rectangle(0, -h*0.70, w*1.40 , h*0.80, { isSensor: true }),
+            bottom: Bodies.rectangle(0, h*0.70, w*1.40 , h*0.80, { isSensor: true })
           };
         this.sensors.top.label = "PLAT_TOP";
         this.sensors.bottom.label = "PLAT_BOTTOM";
@@ -745,12 +842,13 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         this.sprite
         .setExistingBody(compoundBody)         
         .setCollisionCategory(CATEGORY.SOLID)
+        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET])
         .setPosition(x, y)
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setStatic(true)
         .setIgnoreGravity(true);    
 
-        this.debug = scene.add.text(this.x, this.y-16, 'platform', { fontSize: '10px', fill: '#00FF00' });             
+        this.debug = scene.add.text(this.x, this.y-16, 'platform', { fontSize: '10px', fill: '#00FF00' }).setDepth(this.depth+1);             
         this.onWayTracker = -1;
         //Setup to allow to carry riders
         this.scene.matterCollision.addOnCollideActive({
@@ -787,19 +885,21 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         this.setSize(w,h);
         this.setDisplaySize(w,h);
         this.name = name;
-        this.platformPosition = 0;
+        this.platformPosition = 0; //0 to 1
         this.target = {name: -1,type: -1, object: []};
         this.ready = true;
         this.setHighSpeed = 0;
         this.immobile = true;
         this.tmloop = -1;
         this.autostart = false;
+        this.togglePath = false;
         if(properties != undefined && Object.keys(properties).length > 0){
             this.target.name = properties.targetName;
             this.target.type = properties.targetType;
             this.path = properties.path != undefined ? JSON.parse(properties.path) : -1;
             this.tmloop = properties.loop;
             this.autostart = properties.autostart;
+            this.togglePath = properties.togglepath != undefined ? properties.togglepath : false;
             if(properties.frame != undefined){this.setFrame(properties.frame)};
         }
        if(this.autostart && (this.path != undefined && this.path != -1)){ 
@@ -814,11 +914,11 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
     update(time, delta)
     {       
 
-        this.debug.setPosition(this.x, this.y-16);
-        this.debug.setText(this.name+" "
-        +String(this.body.velocity.x.toFixed(2))+":"
-        +String(this.body.velocity.y.toFixed(2))+":"
-        +String(this.ready));
+        // this.debug.setPosition(this.x, this.y-16);
+        // this.debug.setText(this.name+" "
+        // +String(this.body.velocity.x.toFixed(2))+":"
+        // +String(this.body.velocity.y.toFixed(2))+":"
+        // +String(this.ready));
         // body is static so must manually update velocity for friction to work
         this.setVelocityX((this.x - this.prev.x));
         this.setVelocityY((this.y - this.prev.y));
@@ -863,10 +963,16 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         this.timeline.setCallback('onComplete',this.platComplete,[this],this.timeline);
         this.timeline.loop = this.tmloop;
         path.forEach(function(e){
+            let dX = e.x;
+            let dY = e.y; 
+            if(this.togglePath && this.platformPosition == 1){
+                dX = e.x*-1;
+                dY = e.y*-1;
+            }
             this.timeline.add({
                 targets: this,
-                x: this.x+e.x,
-                y: this.y+e.y,
+                x: this.x+dX,
+                y: this.y+dY,
                 ease: 'Cubic.easeInOut',
                 duration: e.t,
                 hold: e.h
@@ -891,6 +997,8 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
     }
     platComplete(plat){
         plat.ready = true;
+        plat.platformPosition = 1 - plat.platformPosition;
+        console.log("Platform tween complete",plat.name,plat.platformPosition,plat.togglePath);
     }
     trackOneWay(){
         let targetObjTop = this.onWayTracker.obj.getTopCenter();
@@ -914,12 +1022,13 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
     oneWayStart(player,d){
         this.setCollidesWith([~CATEGORY.SOLANA]);
         this.onWayTracker = {obj: player,  direction: d};
-        
+        this.setTint(0x004400);
 
     }
     oneWayEnd(){        
-        this.setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK]);
+        this.setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET]);
         this.onWayTracker = -1;
+        this.clearTint();
     }
 };
 //Crystals can be charged with solar blasts to light up for a short period. They slowly get dimmer.
@@ -1028,3 +1137,50 @@ class CrystalLamp extends Phaser.Physics.Matter.Sprite {
 
 }
 
+class Seesaw extends Phaser.Physics.Matter.Image {
+    constructor(scene,x,y,offset) {
+        super(scene.matter.world, x, y, 'seesaw');
+        this.scene = scene;
+        scene.matter.world.add(this);
+        scene.add.existing(this); 
+
+        this.setActive(true);
+
+        const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
+        const { width: w, height: h } = this;
+        const mainBody =  Bodies.rectangle(0, 0, w, h);
+        
+        const compoundBody = Body.create({
+            parts: [mainBody],
+            frictionStatic: 0,
+            frictionAir: 0.07,
+            friction: 0.5,
+            density: 0.5,
+            label: 'SEESAW'
+        });
+        this.balanceOffset = offset != undefined ? offset:0;
+        this
+        .setExistingBody(compoundBody)
+        .setCollisionCategory(CATEGORY.SOLID)
+        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.DARK, CATEGORY.SOLID, CATEGORY.GROUND])
+        .setPosition(x, y)
+        .setIgnoreGravity(true)
+        .setVisible(true);  
+
+        this.pivotConstraint = Phaser.Physics.Matter.Matter.Constraint.create(
+            {
+              pointA: { x: this.x+this.balanceOffset, y: this.y },
+              bodyB: this.body,
+              pointB: { x: this.balanceOffset, y: 0 },
+              length: 0,
+              stiffness: 1
+            }
+          );
+        this.scene.matter.world.add(this.pivotConstraint);
+    }
+    update()
+    {
+
+    }
+
+}

@@ -167,11 +167,15 @@ var Preloader = new Phaser.Class({
 		this.load.tilemapTiledJSON('m1s1a', 'assets/world/m1s1a.json');
 		this.load.tilemapTiledJSON('m2s1', 'assets/world/m2s1.json');
 		this.load.tilemapTiledJSON('m2s2', 'assets/world/m2s2.json');
+		this.load.tilemapTiledJSON('m2s3', 'assets/world/m2s3.json');
+		this.load.tilemapTiledJSON('m2s4', 'assets/world/m2s4.json');
+		this.load.tilemapTiledJSON('m2s5', 'assets/world/m2s5.json');
 		this.load.tilemapTiledJSON('m6s1', 'assets/world/m6s1.json');
 		this.load.tilemapTiledJSON('m6s1a', 'assets/world/m6s1a.json');
 		//Map Tilesets
 		this.load.tilemapTiledJSON('storymap_forest_1', 'assets/world/storyboard_forest1.json');  
-		this.load.spritesheet('tiles32', 'assets/world/oldTileset32.png', {frameWidth: 32, frameHeight: 32, spacing: 2}); 
+		this.load.spritesheet('tiles32', 'assets/world/oldTileset32.png', {frameWidth: 32, frameHeight: 32, spacing: 2});
+		this.load.spritesheet('tiles_custom', 'assets/world/tile_custom.png', {frameWidth: 16, frameHeight: 16,});  
 		this.load.spritesheet('castle32', 'assets/world/tile_castle_grey_extruded.png', {frameWidth: 32, frameHeight: 32}); 
 		this.load.spritesheet('corruption32', 'assets/world/corruption.png', {frameWidth: 32, frameHeight: 32}); 
 		this.load.spritesheet('collisions32', 'assets/world/map_collision.png', {frameWidth: 32, frameHeight: 32}); 
@@ -223,6 +227,9 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('PF_StrangeWorld1_0_mainlevbuildA', 'tmx/tilesets/PF_StrangeWorld1.0/mainlevbuildA.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('PF_StrangeWorld1_0_mainlevbuildB', 'tmx/tilesets/PF_StrangeWorld1.0/mainlevbuildB.png', {frameWidth: 32, frameHeight: 32});
 
+		//load level config data
+		this.load.json('levelconfigdata', 'src/utility/levelsconfig.json ');
+
 		//Entity Assets
         this.load.spritesheet('slime1', 'assets/characters/slimemonster2.png', {frameWidth: 64, frameHeight: 37});    
         this.load.spritesheet('bullet', 'assets/objects/projectiles.png', {frameWidth: 16, frameHeight: 16});
@@ -238,7 +245,7 @@ var Preloader = new Phaser.Class({
         this.load.spritesheet('npc1', 'assets/characters/npc1.png', {frameWidth: 16, frameHeight: 32});
         this.load.spritesheet('dark', 'assets/characters/darkV2.png', {frameWidth: 48, frameHeight: 48});
         this.load.spritesheet('soul_light', 'assets/characters/soul_light.png', {frameWidth: 32, frameHeight: 32});
-		this.load.spritesheet('mirror', 'assets/objects/mirror2.png', {frameWidth: 32, frameHeight: 32});
+		this.load.spritesheet('mirror', 'assets/objects/mirror.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('lever', 'assets/objects/lever.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('pressure_plate', 'assets/objects/pressure_plate.png', {frameWidth: 32, frameHeight: 16});
 		this.load.spritesheet('tmxbutton', 'assets/objects/tmxbutton.png', {frameWidth: 16, frameHeight: 16});
@@ -257,8 +264,14 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('window_shatter', 'assets/objects/window_shatter.png', {frameWidth: 64, frameHeight: 96});
         this.load.spritesheet('solana_shield', 'assets/objects/solana_shield.png', {frameWidth: 32, frameHeight: 32});
         this.load.spritesheet('chest', 'assets/objects/chest.png', {frameWidth: 64, frameHeight: 48});
+        this.load.spritesheet('gear', 'assets/objects/gear.png', {frameWidth: 16, frameHeight: 16});
         this.load.spritesheet('minecart', 'assets/objects/minecart.png', {frameWidth: 96, frameHeight: 48});
-        this.load.spritesheet('minecart_wheel', 'assets/objects/minecart_wheel.png', {frameWidth: 13, frameHeight: 13});
+		this.load.spritesheet('minecart_wheel', 'assets/objects/minecart_wheel.png', {frameWidth: 13, frameHeight: 13});
+        this.load.image('seesaw', 'assets/objects/seesaw.png');
+		//Props
+		this.load.spritesheet('fan-1', 'assets/objects/fan-1.png', {frameWidth: 64, frameHeight: 32});
+		this.load.spritesheet('inchworm-1', 'assets/objects/props_inchworm.png', {frameWidth: 16, frameHeight: 16});
+		this.load.spritesheet('bat-1', 'assets/objects/props_bat.png', {frameWidth: 32, frameHeight: 16});
 		//SoulCrystals
 		this.load.spritesheet('soulcrystal_blue', 'assets/objects/crystal-qubodup-ccby3-32-blue.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('soulcrystal_grey', 'assets/objects/crystal-qubodup-ccby3-32-grey.png', {frameWidth: 32, frameHeight: 32});		
@@ -275,12 +288,15 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('boss_slime_main', 'assets/characters/boss/boss_slime.png', {frameWidth: 256, frameHeight: 256});
 		this.load.spritesheet('boss_slime_column', 'assets/characters/boss/boss_slime_column.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('boss_slime_acidpool', 'assets/characters/boss/boss_slime_acidpool.png', {frameWidth: 32, frameHeight: 32});
+		//Enemies		
+		this.load.spritesheet('shrieker', 'assets/objects/mushroom_2.png', {frameWidth: 32, frameHeight: 32});
+		this.load.spritesheet('spiker', 'assets/objects/spiker_1.png', {frameWidth: 32, frameHeight: 32});
 		//Controller
 		this.load.image('icon_kb_spcbar', 'assets/UI/Keyboard_Mouse/Dark/Keyboard_Black_Space.png');
 		
 		//Images
 		this.load.spritesheet('ability_solarblast', 'assets/objects/ability_solarblast.png', {frameWidth: 16, frameHeight: 16});		
-		this.load.image('soullightblast', 'assets/objects/soullightblastv2.png');
+		this.load.spritesheet('soullightblast', 'assets/objects/soullightblastv2.png',{frameWidth: 64, frameHeight: 64});
 		this.load.image('mask1', 'assets/objects/mask1.png');
 		this.load.image('mask2', 'assets/objects/mask2.png');
 		this.load.image('light1', 'assets/objects/light1.png');
@@ -292,6 +308,10 @@ var Preloader = new Phaser.Class({
 		this.load.image('triggerzone', 'assets/objects/triggerzone.png');
 		this.load.image('speechbubble', 'assets/hud/speechBubble.png');
 		this.load.image('tmxwindow', 'assets/objects/tmxwindow.png');
+		this.load.image('mushroom1', 'assets/objects/mushroom_1.png');
+		this.load.image('grinder', 'assets/objects/grinder.png');
+		this.load.image('conveyor_wheel', 'assets/objects/conveyor_wheel.png');
+		this.load.image('oilblob2', 'assets/objects/oil_blob2.png');
 		// - HUD
 		this.load.spritesheet('health_blip', 'assets/hud/health_blip.png',{frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('hud_interaction_control_arrows','assets/hud/hud_interaction_control_arrows.png',{frameWidth: 32, frameHeight: 32});
@@ -318,6 +338,7 @@ var Preloader = new Phaser.Class({
 		//Water // https://github.com/jorbascrumps/phaser-plugin-water-body
 		this.load.image('droplet', 'assets/effects/water/droplet.png');
 		this.load.image('water', 'assets/effects/water/water.jpg');
+		this.load.image('liquiddroplet', 'assets/objects/droplet.png');
 
 		// font
 		this.load.bitmapFont('fontwhite', 'img/fontwhite.png', 'img/fontwhite.xml');

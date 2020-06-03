@@ -36,16 +36,13 @@ var GameScene = new Phaser.Class({
         // this.soundTheme.play('themepart1',{loop: true, volume: 0.20});
         this.soundTheme.play({loop: true, volume: 0.20});   
 
-
         //Make the map
         map = this.make.tilemap({key: current_map});   
         //Update Global Tilesizes
         mapTileSize.tw = map.tileWidth;   
         mapTileSize.th = map.tileHeight;
         //Get the lvl config from config.js object
-        let lvlCfg = getLevelConfigByName(current_map);
-        console.log(this.matter.world)
-        //console.log(map);
+        let lvlCfg = getLevelConfigByName(this,current_map);
         //Create Background - This will need to be custom based on the map.
         lvlCfg.backgrounds.forEach(e=>{
             world_backgrounds.push(this.add.tileSprite(512, 256, map.widthInPixels*2, map.heightInPixels*2, e));
@@ -53,17 +50,18 @@ var GameScene = new Phaser.Class({
         
         var tilesetImages = [];
         lvlCfg.tsPairs.forEach(e=>{
-            tilesetImages.push(map.addTilesetImage(e.tsName,e.tsKey));
+            //console.log(e.tsName,e.tsKey,e.tw,e.th,e.tm,e.tspc)
+            tilesetImages.push(map.addTilesetImage(e.tsName,e.tsKey,e.tw,e.th,e.tm,e.tspc));
         });
 
     
         //Load the collision tiles
         var CollisionTiles = map.addTilesetImage('collision','collisions32');//called it collision in tiled
         // create the Graphic layers      
-        this.bglayer3 = map.createStaticLayer('bg3', tilesetImages, 0, 0);
-        this.bglayer2 = map.createStaticLayer('bg2', tilesetImages, 0, 0);
-        this.bglayer = map.createStaticLayer('bg', tilesetImages, 0, 0);
-        this.fglayer = map.createStaticLayer('fg', tilesetImages, 0, 0); 
+        this.bglayer3 = map.createStaticLayer('bg3', tilesetImages, 0, 0).setDepth(DEPTH_LAYERS.BG-3);
+        this.bglayer2 = map.createStaticLayer('bg2', tilesetImages, 0, 0).setDepth(DEPTH_LAYERS.BG-2);
+        this.bglayer = map.createStaticLayer('bg', tilesetImages, 0, 0).setDepth(DEPTH_LAYERS.BG-1);
+        this.fglayer = map.createStaticLayer('fg', tilesetImages, 0, 0).setDepth(DEPTH_LAYERS.FG); 
         //Create the special layers
         let fghiddenlayer= map.createDynamicLayer('fg_hidden', tilesetImages, 0, 0); 
         let fgbreakablelayer= map.createDynamicLayer('fg_breakable', tilesetImages, 0, 0); 
@@ -104,16 +102,17 @@ var GameScene = new Phaser.Class({
         //Clear Light Polygons
         lightPolygons = [];
         //Generate shadow canvas
-        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.7);
+        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.7).setDepth(DEPTH_LAYERS.PLAYERS);
         this.shadow_graphic = this.make.graphics();    
         this.shadow_graphic.setPosition(0,0);        
         this.shadow_mask = this.shadow_graphic.createGeometryMask();
         this.shadow_mask.setInvertAlpha();
         this.shadow_background.setMask(this.shadow_mask);
+        this.visiblityPolygon = {p: null, x:0, y:0};
 
         //Draw Debug
         this.matter.world.createDebugGraphic();
-        this.matter.world.drawDebug = false;        
+        this.matter.world.drawDebug = true;        
         this.worldGrid = this.add.grid(0,0,map.widthInPixels*2,map.heightInPixels*2,16,16,0x333333,0.1,0x000000,0.8).setOrigin(0);
         this.worldGrid.setVisible(false);
         //Add Labels for tile bodies for easier collision management
@@ -171,12 +170,14 @@ var GameScene = new Phaser.Class({
             shapeObject.setVisible(false);
             shapeObject.setStatic(true);
             shapeObject.setCollisionCategory(CATEGORY.GROUND) 
+            shapeObject.setCollidesWith([~CATEGORY.GROUND]);
             shapeObject.body.label = 'GROUND'; 
             //Make the friction come from a property setter. Default to 0.01.
             
             shapeObject.body.friction = hullprops != undefined? (hullprops.friction != undefined ? hullprops.friction : 0.01 ) : 0.01;
             hulls.push(shapeObject);
             losBlockers.push(shapeObject.body);
+            losBlockAndReflect.push(shapeObject.body);
         });
 
         //Perimeter Block for Blocking Light
@@ -188,7 +189,7 @@ var GameScene = new Phaser.Class({
         solana = new Solana(this,192,160);  
         bright = new Bright(this,192,128);
         soullight =new SoulLight({scene: this, x:192,y:128,sprite:'bright',frame:0},solana);
-
+        
         //
         this.changePlayerReady = true;
         //Emit Events
@@ -203,7 +204,7 @@ var GameScene = new Phaser.Class({
         bright.toDark(); //Bright Starts the game off as dark
 
         //Create Camera        
-        this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels+128);  
+        this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);  
         this.cameras.main.setBackgroundColor('#000000'); 
         this.cameras.main.roundPixels = true;
         this.cameras.main.setZoom(2);
@@ -355,13 +356,27 @@ var GameScene = new Phaser.Class({
             classType: SolBomb,
             runChildUpdate: true 
         });
-        
+        //Solbombs
+        gears = this.add.group({ 
+            classType: TMXGear,
+            runChildUpdate: true 
+        });
+        //Solbombs
+        liquiddrops = this.add.group({ 
+            classType: Droplet,
+            runChildUpdate: true 
+        });
         //Clear Boss
         boss = -1;
 
         speed = Phaser.Math.GetSpeed(300, 1);
        
-
+        //Create Pathing layer
+        let pathingLayer = map.getObjectLayer('pathing');
+        pathingLayer.objects.forEach(e=>{
+            pathingNodes.push(new PathingNode(e.name,e.polyline,e.x,e.y));
+        })
+        console.log(pathingNodes);
         //Create enemy layer
         enemylayer = map.getObjectLayer('enemies');
         //Create spawn layer 
@@ -404,13 +419,7 @@ var GameScene = new Phaser.Class({
         for(e=0;e<enemylayer.objects.length;e++){
             let tmxObjRef = enemylayer.objects[e];
             let props = getTileProperties(tmxObjRef.properties);
-            let EnemyType = props.enemyType;
-            let EnemyClass = props.enemyClass;
-            let PassiveBehavior = props.pBehav;
-            let AggressivBehavior = props.aBehav;
-            let weapon = props.weapon;
-            let new_enemy;
-            let path = '[{"x":0,"y":0}]';
+
 
             //Boss?
             if(tmxObjRef.type == "boss"){
@@ -428,36 +437,65 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "spider"){
                 spider = spiders.get(tmxObjRef.x,tmxObjRef.y);
                 spider.setPosition(tmxObjRef.x,tmxObjRef.y);
+            }else if(tmxObjRef.type == "shrieker"){
+                let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
+                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
+                let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
+                if(tmxObjRef.rotation != 0){      
+                    Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
+                }  
+                let skr = new EnemyShrieker(this,centerPoint.x,centerPoint.y);
+                skr.setRotation(rotRad);
+            }else if(tmxObjRef.type == "blob"){
+                let blobC = new EnemyBlobC(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2,tmxObjRef.width,tmxObjRef.height);
+            }else if(tmxObjRef.type == "spiker"){
+                let spiker = new EnemySpiker(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0)
             }else{
-                //Standard Types            
-                if(EnemyClass == 'ground'){
-                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
-                }else if(EnemyClass == 'air'){
-                    new_enemy = enemiesFly.get(tmxObjRef.x,tmxObjRef.y,EnemyType);                
-                }else{
-                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
-                }
+                // let EnemyType = props.enemyType;
+                // let EnemyClass = props.enemyClass;
+                // let PassiveBehavior = props.pBehav;
+                // let AggressivBehavior = props.aBehav;
+                // let weapon = props.weapon;
+                // let new_enemy;
+                // let path = '[{"x":0,"y":0}]';
+                // //Standard Types            
+                // if(EnemyClass == 'ground'){
+                //     new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
+                // }else if(EnemyClass == 'air'){
+                //     new_enemy = enemiesFly.get(tmxObjRef.x,tmxObjRef.y,EnemyType);                
+                // }else{
+                //     new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
+                // }
+                // //Set manual path if available
+                // if(props.path){
+                //     path = JSON.parse(props.path);
+                // }
+                // //Accept Pathing Objects from TMX if available
+                // if(props.pathid){
+                //     let findPath = pathingNodes.find(e => {
+                //         return e.name === props.pathid;
+                //     })
+                //     if(findPath){
+                //         path = findPath.worldpoints;
+                //     }
+                // }
+                // if(props.tint){
+                //     let newTint =  (Phaser.Display.Color.HexStringToColor(props.tint))._color; //0x333333
+                //     new_enemy.setTint(newTint);
+                // }
+                // if(props.scale){
+                //     new_enemy.setScale(props.scale);
+                // }
 
-                if(props.path){
-                    path = props.path;
-                }
-                if(props.tint){
-                    let newTint =  (Phaser.Display.Color.HexStringToColor(props.tint))._color; //0x333333
-                    new_enemy.setTint(newTint);
-                }
-                if(props.scale){
-                    new_enemy.setScale(props.scale);
-                }
-
-                if(new_enemy){
-                    //Setup Enemy
-                    new_enemy.setActive(true);
-                    new_enemy.setVisible(true);
-                    new_enemy.setBehavior(PassiveBehavior,AggressivBehavior,weapon);
-                    new_enemy.setPath(path);
+                // if(new_enemy){
+                //     //Setup Enemy
+                //     new_enemy.setActive(true);
+                //     new_enemy.setVisible(true);
+                //     new_enemy.setBehavior(PassiveBehavior,AggressivBehavior,weapon);
+                //     new_enemy.setPath(path);
                     
                     
-                } 
+                // } 
             }
         }
         //Spawn Objects
@@ -475,7 +513,8 @@ var GameScene = new Phaser.Class({
                 if(tmxObjRef.rotation != 0){      
                     Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
                 }     
-                mir.setup(centerPoint.x,centerPoint.y,tmxObjRef.rotation);
+                mir.setup(centerPoint.x,centerPoint.y,tmxObjRef.rotation,tmxObjRef.name);
+                losBlockAndReflect.push(mir.body);
             }else if(tmxObjRef.type == "window"){  
                 let bar = barriers.get(-1000,-1000,"tmxwindow",0,true);
                 let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
@@ -504,6 +543,7 @@ var GameScene = new Phaser.Class({
                 })
                 let platfallprops = getTileProperties(tmxObjRef.properties);
                 let pf = platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-oG);
+                pf.setDepth(DEPTH_LAYERS.PLATFORMS);
                 if(platfallprops != undefined){
                     if(platfallprops.shakeTime != undefined && platfallprops.shakeCount != undefined){
                         pf.setShakeTime(platfallprops.shakeTime,platfallprops.shakeCount);
@@ -525,7 +565,8 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "rockchute"){  
                 let rockchute = new RockChute(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);                
             }else if(tmxObjRef.type == "crate"){  
-                let newCrate = crates.get(tmxObjRef.x,tmxObjRef.y);
+                let newCrate = crates.get(tmxObjRef.x,tmxObjRef.y);                        
+                newCrate.setDensity(0.025);
             }else if(tmxObjRef.type == "telebeam"){
                 let tb = new Telebeam(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
                 let telebeamProps = getTileProperties(tmxObjRef.properties);
@@ -536,7 +577,7 @@ var GameScene = new Phaser.Class({
                 //Dynamically Resize platforms Swing
                 swingTw.setSize(tmxObjRef.width,tmxObjRef.height);
                 swingTw.setDisplaySize(tmxObjRef.width,tmxObjRef.height);
-                swingTw.setup(swingTw.x,swingTw.y, getTileProperties(tmxObjRef.properties),tmxObjRef.name);
+                swingTw.setup(swingTw.x,swingTw.y, getTileProperties(tmxObjRef.properties),tmxObjRef.name,tmxObjRef.width,tmxObjRef.height);
 
             }else if(tmxObjRef.type == 'soulcrystal'){
                 let scprops = getTileProperties(tmxObjRef.properties);
@@ -568,19 +609,20 @@ var GameScene = new Phaser.Class({
                     shapeObject.body.label = 'JUNK'; 
             }else if(tmxObjRef.type == 'water'){
                 let wtprops = getTileProperties(tmxObjRef.properties);
-                let wtOps = {dampening: .0001,tension: 0.01,texture: 'water'};
+                let wtOps = {dampening: .0001,tension: 0.01,texture: 'water',renderDepth: DEPTH_LAYERS.BG-4};
                 let wt = new TMXWater(this,tmxObjRef.x,tmxObjRef.y,tmxObjRef.width,tmxObjRef.height,tmxObjRef.height,wtOps);
             }else if(tmxObjRef.type == 'chest'){
                 let chestProps = getTileProperties(tmxObjRef.properties);
                 let chest = new Chest(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
             }else if(tmxObjRef.type == 'line'){
-                console.log(tmxObjRef);
+                
                 let g_sp1 = this.add.graphics();
                 g_sp1.setPosition(tmxObjRef.x,tmxObjRef.y);
-                g_sp1.lineStyle(2, 0xFF00FF, 1.0);
+                g_sp1.lineStyle(4, 0x000000, 1.0);
                 // let spl = new Phaser.Curves.Spline(tmxObjRef.polyline);
                 // spl.draw(g_sp1);
                 let polyPath =  new Phaser.Curves.Path();
+                let polySpline =  new Phaser.Curves.Spline(tmxObjRef.polyline);
                 tmxObjRef.polyline.forEach((e,i)=>{
                     if(i==0){
                         polyPath.moveTo(e);
@@ -588,11 +630,43 @@ var GameScene = new Phaser.Class({
                         polyPath.lineTo(e);
                     };
                 });
-                polyPath.draw(g_sp1);
+
+
+                //polyPath.draw(g_sp1);
+                polySpline.draw(g_sp1);
+                g_sp1.lineStyle(2, 0x444444, 0.8);
+                polySpline.draw(g_sp1);
+                g_sp1.setDepth(DEPTH_LAYERS.FG);
             }else if(tmxObjRef.type == 'minecart'){
                 let cart = new Vehicle(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2).setDepth(DEPTH_LAYERS.FRONT);
                 cart.wA.setDepth(DEPTH_LAYERS.FRONT);
                 cart.wB.setDepth(DEPTH_LAYERS.FRONT);
+            }else if(tmxObjRef.type == 'decal'){
+                let genprops = getTileProperties(tmxObjRef.properties);
+                if(genprops.srctype == 'sprite'){
+                    let decal = this.add.sprite(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,genprops.texture);
+                    decal.anims.play(genprops.anim, true);
+                }else if(genprops.srctype == 'image'){
+                    let decal = this.add.image(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,genprops.texture);
+                }
+                
+            }else if(tmxObjRef.type == 'trap'){
+                let trapprops = getTileProperties(tmxObjRef.properties);
+                if(trapprops.subtype == 'grinder'){
+                    let trap = new TrapGrinder(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,trapprops.angvel).setDepth(DEPTH_LAYERS.FRONT)
+                }
+            }else if(tmxObjRef.type == 'conveyor'){
+                let conveyorprops = getTileProperties(tmxObjRef.properties); 
+                let sPoint = {x:tmxObjRef.x+tmxObjRef.polyline[0].x,y:tmxObjRef.y+tmxObjRef.polyline[0].y};
+                let ePoint = {x:tmxObjRef.x+tmxObjRef.polyline[1].x,y:tmxObjRef.y+tmxObjRef.polyline[1].y};
+                let conveyor = new Conveyor(this,sPoint,ePoint,conveyorprops.angvel);                
+            }else if(tmxObjRef.type == 'prop'){
+                let propprops = getTileProperties(tmxObjRef.properties);
+                if(propprops.subtype == 'bat'){
+                    let propBat = new PropBat(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+                }else if(propprops.subtype == 'inchworm'){
+                    let propWorm = new PropInchworm(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+                }
             }
         }
         //Spawn Triggers
@@ -600,6 +674,9 @@ var GameScene = new Phaser.Class({
             //Check for Type first, to determine the GET method used.
             let triggerObj;
             let tmxObjRef = triggerlayer.objects[e];
+            let trig_x_offset = tmxObjRef.width/2;
+            let trig_y_offset = tmxObjRef.height/2;
+            let trig_props = getTileProperties(tmxObjRef.properties)
             if(tmxObjRef.type == "lever"){  
                 triggerObj = new TMXLever(this,tmxObjRef.x,tmxObjRef.y);             
                 levers.add(triggerObj);
@@ -616,11 +693,17 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "zone"){
                 triggerObj = triggerzones.get();
                 triggerObj.setDisplaySize(tmxObjRef.width, tmxObjRef.height);
+            }else if(tmxObjRef.type == "gear"){                
+                triggerObj = gears.get();
+            }else if(tmxObjRef.type == "seesaw"){ 
+                let seesaw = new Seesaw(this,tmxObjRef.x+trig_x_offset,tmxObjRef.y+trig_y_offset,trig_props.balanceOffset);
+                seesaw.setDensity(0.025);
+                seesaw.setDisplaySize(tmxObjRef.width, tmxObjRef.height);
+                seesaw.setSize(tmxObjRef.width, tmxObjRef.height);
             }
             if(triggerObj){
-                let trig_x_offset = tmxObjRef.width/2;
-                let trig_y_offset = tmxObjRef.height/2;
-                triggerObj.setup(tmxObjRef.x+trig_x_offset,tmxObjRef.y+trig_y_offset,getTileProperties(tmxObjRef.properties),tmxObjRef.name,tmxObjRef.width,tmxObjRef.height);
+                triggerObj.setup(tmxObjRef.x+trig_x_offset,tmxObjRef.y+trig_y_offset,trig_props,tmxObjRef.name,tmxObjRef.width,tmxObjRef.height);
+                triggerObj.setDepth(DEPTH_LAYERS.PLATFORMS);
             }
         }
           
@@ -657,6 +740,7 @@ var GameScene = new Phaser.Class({
         setupTriggerTargets(triggerzones,"zones",this);
         setupTriggerTargets(platforms,"platforms",this);
         setupTriggerTargets(crystallamps,"crystallamps",this);
+        setupTriggerTargets(gears,"gears",this);
 
         //Particles
         emitter_dirt_spray = this.add.particles('impact1').createEmitter({
@@ -792,6 +876,9 @@ var GameScene = new Phaser.Class({
                       || gameObjectB instanceof PlatSwingTween
                       || gameObjectB instanceof PlatSwing
                       || gameObjectB instanceof BreakableTile 
+                      || gameObjectB instanceof Crate 
+                      || gameObjectB instanceof Seesaw 
+                      || gameObjectB instanceof TMXGear
                       || gameObjectB instanceof BrightBeamBlock)) {   
                 
                 //handle plaform jumping allowance             
@@ -836,11 +923,9 @@ var GameScene = new Phaser.Class({
                     }
                     if(bodyA.label == "SOLANA_RIGHT"){
                         solana.touching.right++;
-                        //solana.x--;
                     }
                     if(bodyA.label == "SOLANA_LEFT"){
                         solana.touching.left++;
-                        //solana.x++;
                     }
                 }                
               }
@@ -859,11 +944,24 @@ var GameScene = new Phaser.Class({
                     }
                     if(bodyA.label == "SOLANA_RIGHT"){
                         solana.touching.right++;
-                        //solana.x--;
+                        // let solBodyHt = solana.getBodyHeight();
+                        // //Parkour - TESTING
+                        // if((solana.y-solBodyHt/2) <= bodyB.bounds.min.y){
+                        //     //Set parkkour data
+                        //     let diff = solBodyHt - (bodyB.bounds.min.y - (solana.y-solBodyHt/2));
+                        //     solana.ledgeGrab("r",diff);
+                        // }
+                        
                     }
                     if(bodyA.label == "SOLANA_LEFT"){
                         solana.touching.left++;
-                        //solana.x++;
+                    //     let solBodyHt = solana.getBodyHeight();
+                    //     //Parkour - TESTING
+                    //     if((solana.y-solBodyHt/2) <= bodyB.bounds.min.y){
+                    //         //Set parkkour data
+                    //         let diff = solBodyHt - (bodyB.bounds.min.y - (solana.y-solBodyHt/2));
+                    //         solana.ledgeGrab("l",diff);
+                    //     }
                     }
                 }                
               }
@@ -877,20 +975,18 @@ var GameScene = new Phaser.Class({
                 || gameObjectB instanceof Fallplat
                 || gameObjectB instanceof PlatSwingTween  
                 || gameObjectB instanceof PlatSwing
-                || gameObjectB instanceof BreakableTile              
+                || gameObjectB instanceof BreakableTile 
+                || gameObjectB instanceof TMXGear
+                || gameObjectB instanceof Seesaw              
                 || gameObjectB instanceof BrightBeamBlock)) {  
 
                     //handle plaform jumping allowance             
                     if(bodyA.label == "SOLANA_TOP"){
-                        solana.touching.up++;
-                        if(bodyB.label == "PLAT_BOTTOM" && gameObjectA.body.velocity.y < 0){
-                            //Start tracking and disable collisions
-                            gameObjectB.oneWayStart(gameObjectA,'up');
-                        }                       
+                        solana.touching.up++;                    
                     }
                     if(bodyA.label == "SOLANA_BOTTOM"){
                         solana.touching.down++;                        
-                        if(bodyB.label == "PLAT_TOP" && gameObjectA.getControllerAction('down')){
+                        if(bodyB.label == "PLAT_TOP" && ((curr_player == players.SOLANA || playerMode > 0 ) && gameObjectA.getControllerAction('down'))){
                             //Allow Fall Thru of platform if pressing down
                             gameObjectB.oneWayStart(gameObjectA,'down');
                         }  
@@ -900,7 +996,16 @@ var GameScene = new Phaser.Class({
                     }
                     if(bodyA.label == "SOLANA_LEFT"){
                         solana.touching.left++;
-                    }                            
+                    }        
+                    
+                    let platformOneWayStarts = ['SOLANA_TOP','SOLANA_RIGHT','SOLANA_LEFT'];
+                    if(platformOneWayStarts.includes(bodyA.label) && bodyB.label == "PLAT_BOTTOM"){
+                        //if(gameObjectA.body.velocity.y < 0){
+                            //Start tracking and disable collisions
+                            gameObjectB.oneWayStart(gameObjectA,'up');
+                        //}
+                    }
+
               }
             //Handle Platform Pass thru
 
@@ -1042,8 +1147,15 @@ var GameScene = new Phaser.Class({
                         }
                     }  
                 }
+                if ((bodyA.label === 'ENEMY_STINGER' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'ENEMY_STINGER')) {                    
+                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'ENEMY');
+                    gObjs[1].receiveDamage(1);
+                }
+
                 //Between Fallplat and Solana and Bright
-                let fallplatHitList = ['SOLANA','BRIGHT'];
+                let fallplatHitList = ['SOLANA','BRIGHT',
+                'BRIGHT_TOP','BRIGHT_BOTTOM','BRIGHT_LEFT','BRIGHT_RIGHT','BRIGHTSENSORS',
+                'SOLANA_TOP','SOLANA_BOTTOM','SOLANA_LEFT','SOLANA_RIGHT'];
                 if ((bodyA.label === 'FALLPLAT' && fallplatHitList.includes(bodyB.label)) || (fallplatHitList.includes(bodyA.label) && bodyB.label === 'FALLPLAT')) {
                     //Get Bullet Object and run hit function
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'FALLPLAT');
@@ -1066,7 +1178,7 @@ var GameScene = new Phaser.Class({
                 //the results.
 
                 //Better function for checking bullets with impact but not additional things
-                let bulletHitList1 = ['SOLID','GROUND','CRATE','PLATFORM'];
+                let bulletHitList1 = ['SOLID','GROUND','CRATE','PLATFORM','BREAKABLE'];
                 if((bodyA.label == 'BULLET' && bulletHitList1.includes(bodyB.label)) || (bodyB.label == 'BULLET' && bulletHitList1.includes(bodyA.label)) ){
                     const bulletBody = bodyA.label === 'BULLET' ? bodyA : bodyB;
                     const bulletObj = bulletBody.gameObject;
@@ -1137,7 +1249,7 @@ var GameScene = new Phaser.Class({
                     if (gObjs[0].active){
                         gObjs[0].unready();
                         gObjs[1].receiveHealth(1);                        
-                        hud.alterEnergyBright(50);
+                        gObjs[1].addEnergy(50);
                     }  
                 }
                 //Between SoulTransfer and Solana
@@ -1148,8 +1260,8 @@ var GameScene = new Phaser.Class({
                     }  
                 }                
                 //Between SoulTransfer and Solid/Ground
-                let SoulTransferBurnList1 = ['SOLID','GROUND'];
-                if((bodyA.label == 'SOULTRANSFER' && bulletHitList1.includes(bodyB.label)) || (bodyB.label == 'SOULTRANSFER' && bulletHitList1.includes(bodyA.label)) ){
+                let SoulTransferBurnList1 = ['SOLID','GROUND','ROCK','BREAKABLE'];
+                if((bodyA.label == 'SOULTRANSFER' && SoulTransferBurnList1.includes(bodyB.label)) || (bodyB.label == 'SOULTRANSFER' && SoulTransferBurnList1.includes(bodyA.label)) ){
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULTRANSFER');
                     if (gObjs[0].active){
                         gObjs[0].burn();
@@ -1182,13 +1294,14 @@ var GameScene = new Phaser.Class({
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'MIRROR');
                     if (gObjs[0].active){
                         gObjs[0].hit();
+                        //console.log("Mirror/ST Evt Data:",event.pairs[i]);
                     }  
                 }
                 //Solana and Fireflies
                 if ((bodyA.label === 'FIREFLY' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'FIREFLY')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'FIREFLY');
                     if (gObjs[0].active){
-                        hud.alterEnergySolana(10);
+                        gObjs[1].addEnergy(10);
                         fireflies.killAndHide(gObjs[0]);
                         //gObjs[0].collect();
                     }  
@@ -1220,11 +1333,14 @@ var GameScene = new Phaser.Class({
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'BRIGHT');
                     if(gObjs[0].light_status == 0){
                         //Bright mode, touching lamp drains energy and turns the lamp on.
-                        gObjs[1].turnOn();
-                        hud.alterEnergyBright(-50);
-                    }else{
-                        gObjs[1].breaklamp();
-                        hud.alterEnergyBright(50);
+                        let brightDiff = gObjs[1].max_brightness - gObjs[1].brightness;
+                        if(brightDiff > 0){
+                            gObjs[1].turnOn();
+                            gObjs[0].addEnergy(-brightDiff);
+                        }
+                    }else{                       
+                        gObjs[0].addEnergy(gObjs[1].brightness);
+                        gObjs[1].turnOff();
                     }
 
                 }
@@ -1296,6 +1412,31 @@ var GameScene = new Phaser.Class({
         // let light  = this.lights.addLight(0, 0, 200).setScrollFactor(0.0).setIntensity(2);
         this.debugDrag = [];
 
+        //Attractor Debug - ONly affects bodies AFTER it was made.
+        // var sun = this.matter.add.image(400, 200, 'button_sun', null, {
+        //     shape: {
+        //         type: 'circle',
+        //         radius: 64
+        //     },
+        //     plugin: {
+        //         attractors: [
+        //             function (bodyA, bodyB) {
+        //                 console.log("attractor",bodyB.label);
+        //                 return {
+        //                     x: (bodyA.position.x - bodyB.position.x) * 0.000001,
+        //                     y: (bodyA.position.y - bodyB.position.y) * 0.000001
+        //                 };
+        //             }
+        //         ]
+        //     }
+        // });
+        // sun.setCollisionCategory(CATEGORY.SOLID)
+        // sun.setCollidesWith([CATEGORY.SOLANA])
+        // sun.setScale(0.30);
+        // sun.setPosition(solana.x,solana.y-32);
+        // sun.setIgnoreGravity(true);
+
+
     },
     update: function (time, delta)
     {
@@ -1307,20 +1448,20 @@ var GameScene = new Phaser.Class({
         let disPlayersY = Math.abs(solana.y - bright.y);
 
         let midPoint = {x:(solana.x+bright.x)/2,y:(solana.y+bright.y)/2}
-        this.cameras.main.centerOn(midPoint.x,midPoint.y);
+        this.cameras.main.centerOn(midPoint.x+soullight.viewoffset.x,midPoint.y+soullight.viewoffset.y);
         //Lvl 1, Normal Mode
-        if(disPlayersX < 500 && disPlayersY < 250 && this.cameraLevel != 1){
+        if(disPlayersX < 400 && disPlayersY < 250 && this.cameraLevel != 1){
             this.cameraLevel = 1;
-            this.cameras.main.zoomTo(2,1000,'Linear');
+            this.cameras.main.zoomTo(2,1000,'Linear',true);
         }
         //Lvl 2, Zoom out
-        if((disPlayersX >= 500 && disPlayersX < 750) || (disPlayersY >= 250 && disPlayersY < 450) && this.cameraLevel != 2){
+        if((disPlayersX >= 400 && disPlayersX < 750) || (disPlayersY >= 250 && disPlayersY < 400) && this.cameraLevel != 2){
             if( this.cameraLevel == 3){this.splitScreen(false);}//If it was split screen, cancel that.
             this.cameraLevel = 2;
-            this.cameras.main.zoomTo(1.75,1000,'Linear');            
+            this.cameras.main.zoomTo(1.75,1000,'Linear',true);            
         }
         //Lvl 3, Split the Camera
-        if((disPlayersX >= 750 || disPlayersY >= 450) && this.cameraLevel != 3){  
+        if((disPlayersX >= 750 || disPlayersY >= 400) && this.cameraLevel != 3){  
             this.cameraLevel = 3;          
             this.splitScreen(true);
         }
@@ -1355,6 +1496,7 @@ var GameScene = new Phaser.Class({
             this.debugAimLine.strokePath();
             this.debugPointer.x = targVector.x-8;
             this.debugPointer.y = targVector.y-8;
+            this.debugAimLine.fillRect(midPoint.x,midPoint.y,8,8);
         }
 
         //Updates
@@ -1371,7 +1513,7 @@ var GameScene = new Phaser.Class({
         //Draw lighting
         var solana_in_light = false;
         this.shadow_graphic.clear();
-        this.cutGraphicRaycastPolgon(soullight.x,soullight.y,1440);
+        this.cutGraphicRaycastPolygon(soullight.x << 0,soullight.y << 0,720);//1440
         //CENTER ON CAMERA AND CALC FOR ANY APPLICABLE OFFSETS        
         this.shadow_graphic.fillCircle(bright.x, bright.y, bright.light_radius);
 
@@ -1401,8 +1543,7 @@ var GameScene = new Phaser.Class({
         solana.inLight = solana_in_light;
         let rate_of_energy_drain_outside_light = 1;
         if(!solana_in_light){
-            hud.alterEnergySolana(-rate_of_energy_drain_outside_light);
-            if(hud.solanaStatBar.getValue() <= 0){solana.receiveDamage(1);};
+            solana.addEnergy(-rate_of_energy_drain_outside_light);
         };
 
         //KEYPRESS DETECTION - USING CUSTOM CONTROLLER CLASS
@@ -1531,34 +1672,44 @@ var GameScene = new Phaser.Class({
     },
     splitScreen(enable){
         if(enable){
-            let cam_p1 = this.cameras.add(0,0,camera_main.width/2,camera_main.height,false,'cam_p1');//Second Camera
-            let cam_p2 = this.cameras.add(camera_main.width/2,0,camera_main.width/2,camera_main.height,false,'cam_p2');//Second Camera
+            let cam_p1 = this.cameras.add(0,0,camera_main.width,camera_main.height/2,false,'cam_p1');//Second Camera
+            let cam_p2 = this.cameras.add(0,camera_main.height/2,camera_main.width,camera_main.height/2,false,'cam_p2');//Second Camera
             cam_p1.setBounds(0, 0, map.widthInPixels, map.heightInPixels+128);  
             cam_p2.setBounds(0, 0, map.widthInPixels, map.heightInPixels+128);  
-            cam_p1.setZoom(1.75);
-            cam_p2.setZoom(1.75);
+            cam_p1.setZoom(1.50);
+            cam_p2.setZoom(1.50);
             cam_p1.startFollow(solana,true,.8,.8,0,0);
             cam_p2.startFollow(bright,true,.8,.8,0,0);
+            camera_main.setVisible(false);
         }else{
+            camera_main.setVisible(true);
             let cam_p1 = this.cameras.getCamera('cam_p1');
             let cam_p2 = this.cameras.getCamera('cam_p2');
             this.cameras.remove(cam_p1);
             this.cameras.remove(cam_p2);
         }
     },
-    cutGraphicRaycastPolgon(x,y,range){
-        let shapes = [];
-        lightPolygons.forEach(function(e){
-            let d = Phaser.Math.Distance.Between(x,y,e[0][0],e[0][1]);
-            if(d < range){
-                shapes.push(e);            
-            }
-        });	
+    cutGraphicRaycastPolygon(x,y,range){
+        //Only Run the create light polygon if there is an position update, otherwise use the old polygon.
+        //This should save resources
+        if(this.visiblityPolygon.x != x || this.visiblityPolygon.y != y){
+            let shapes = [];
+            lightPolygons.forEach(function(e){
+                let d = Phaser.Math.Distance.Between(x,y,e[0][0],e[0][1]);
+                if(d < range){
+                    shapes.push(e);            
+                }
+            });	
 
-        let soullight_border_verts = soullight.protection_circle.getPoints(24);
-        shapes.push(createLightObstaclePolygon(0,0,soullight_border_verts));
+            let soullight_border_verts = soullight.protection_circle.getPoints(24);
+            shapes.push(createLightObstaclePolygon(0,0,soullight_border_verts));
 
-        var visibility = createLightPolygon(x, y, shapes);
+            this.visiblityPolygon.p = createLightPolygon(x, y, shapes);
+            this.visiblityPolygon.x = x;
+            this.visiblityPolygon.y = y;
+        }
+
+        let visibility = this.visiblityPolygon.p;
         if(visibility){
             this.shadow_graphic.beginPath();
             this.shadow_graphic.moveTo(visibility[0][0], visibility[0][1]);
@@ -1604,8 +1755,8 @@ var GameScene = new Phaser.Class({
     },
     generateEnergy(){
         //This looks choppy. I need to make it a single factor, alter the factor and then apply it. 
-        hud.alterEnergySolana(2);
-        hud.alterEnergyBright(2);
+        solana.addEnergy(5);
+        bright.addEnergy(5);
     },
     saveData(){
         //Save Polaris Data
@@ -1642,8 +1793,8 @@ var GameScene = new Phaser.Class({
     getGamepadVectors(gamePadID){
         if(gamePad[gamePadID]){
             //Raw Sticks Vectors
-            let stickRight = gamePad[gamePadID].getStickRight(.1);
-            let stickLeft = gamePad[gamePadID].getStickLeft(.1);
+            let stickRight = gamePad[gamePadID].getStickRight(.01);
+            let stickLeft = gamePad[gamePadID].getStickLeft(.01);
             return [stickLeft,stickRight];
         }
         
@@ -1709,40 +1860,41 @@ function createLightPolygon(x, y, polyset) {
 function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
     //Currently restricted to types. I need to expand this
     triggerGroup.children.each(function(trigger) {
-        //console.log(triggerGroupName,trigger.target);
+
         if(trigger.target.name != -1 && trigger.target.name != undefined){
             let nameList = trigger.target.name.split(",");//Comma delimited listing of target names
             nameList.forEach(name=>{
  
                 //Search all groups and setup targets
                 gates.children.each(function(gate) {
-                    //console.log("Trigger had gate target, searching names");
                     if(gate.name == name){
                         trigger.setTarget(gate);
                     }
                 },trigger);
 
                 triggerzones.children.each(function(zone) {
-                    //console.log("Trigger had gate target, searching names");
                     if(zone.name == name){
                         trigger.setTarget(zone);
                     }
                 },trigger);
 
                 platforms.children.each(function(platform) {
-                    //console.log("Trigger had gate target, searching names");
                     if(platform.name == name){
                         trigger.setTarget(platform);
                     }
                 },trigger);
 
                 plates.children.each(function(plate) {
-                    //console.log("Trigger had gate target, searching names");
                     if(plate.name == name){
                         trigger.setTarget(plate);
                     }
                 },trigger);
                 
+                mirrors.children.each(function(mirror) {
+                    if(mirror.name == name){
+                        trigger.setTarget(mirror);
+                    }
+                },trigger);
             })
 
         }
@@ -1933,6 +2085,12 @@ function createAnimations(scene){
     scene.anims.create({
         key: 'solana-webbed',
         frames: scene.anims.generateFrameNumbers('solana', { start: 22, end: 22 }),
+        frameRate: 6,
+        repeat: -1
+    });    
+    scene.anims.create({
+        key: 'solana-ladder',
+        frames: scene.anims.generateFrameNumbers('solana', { start: 24, end: 25 }),
         frameRate: 6,
         repeat: -1
     });
@@ -2208,5 +2366,42 @@ function createAnimations(scene){
         frames: scene.anims.generateFrameNumbers('chest', { frames:[0,1,2] }),
         frameRate: 4,
         repeat: 0
+    });       
+    scene.anims.create({
+        key: 'fan-running',
+        frames: scene.anims.generateFrameNumbers('fan-1', { frames:[0,1,2,3,4,5] }),
+        frameRate: 12,
+        repeat: -1
     }); 
+    scene.anims.create({
+        key: 'shrieker-shriek',
+        frames: scene.anims.generateFrameNumbers('shrieker', { frames:[0,1,2,2,2,1,0] }),
+        frameRate: 12,
+        repeat: 0
+    }); 
+    scene.anims.create({
+        key: 'shrieker-shrivel',
+        frames: scene.anims.generateFrameNumbers('shrieker', { frames:[3,4,5,6,7,8,9,10] }),
+        frameRate: 12,
+        repeat: 0
+    }); 
+    scene.anims.create({
+        key: 'inchworm-crawl',
+        frames: scene.anims.generateFrameNumbers('inchworm-1', { frames:[0,1,2,3] }),
+        frameRate: 8,
+        repeat: -1
+    }); 
+    scene.anims.create({
+        key: 'bat-unfurl',
+        frames: scene.anims.generateFrameNumbers('bat-1', { frames:[3,2] }),
+        frameRate: 8,
+        repeat: 0
+    }); 
+    scene.anims.create({
+        key: 'bat-fly',
+        frames: scene.anims.generateFrameNumbers('bat-1', { frames:[0,1] }),
+        frameRate: 8,
+        repeat: -1
+    }); 
+    
 }
