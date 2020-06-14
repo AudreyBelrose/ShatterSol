@@ -86,10 +86,23 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.beamAbility = new BrightBeam(this.scene,this.x,this.y,this.rotation);
         this.beamReady = true;
         this.beamCoolDown = this.scene.time.addEvent({ delay: 1000, callback: this.resetBeam, callbackScope: this, loop: true });
-
+        this.beamPrevVec2 = {x:0,y:0};
+        //Light Dash
+        this.lightdashTimer = this.scene.time.addEvent({ delay: 200, callback: this.resetLightDask, callbackScope: this, loop: false });
+        this.lightdashReady = true;
+        //Dark Dask
         this.darkdashTimer = this.scene.time.addEvent({ delay: 200, callback: this.resetDarkDask, callbackScope: this, loop: false });
         this.darkdashReady = true;
         this.slamReady = true;
+        //Shield Mode - Form a shield lock onto Solana and protect her by blocking bullets and attacks.
+        this.shieldMode = false;
+        //A Constraint might work best here.
+        // this.scene.matter.add.constraint(bright, solana, 64, 1.0, {
+        //     pointA: { x: 0, y: 0},
+        //     pointB: { x: 0, y: 0},
+        //     length: 64.0,
+        //     stiffness: 1.0
+        // })
 
         //Controller
         this.controller;
@@ -138,7 +151,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     this.sprite.anims.play('dark-idle', false);
                     if(this.falling){
                         //If I was falling, shake the camera.
-                        camera_main.shake(80,.005);
+                        //camera_main.shake(80,.005);
                         this.falling = false;
                         
                     }
@@ -151,8 +164,15 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             //Drain Energy since not bright
             if(this.light_status == darkMode){
                 this.addEnergy(-1);
-                if(hud.brightStatBar.getValue() <= 0){this.receiveDamage(1);};
-            };
+                if(hud.brightStatBar.getValue() <= 0){
+                    this.receiveDamage(1);
+                };
+            }else{
+                if(hud.brightStatBar.getValue() <= 0){
+                    this.toDark();
+                    soullight.lose();
+                }
+            }
             //This creates a wobble of contention for add and remove values on different update loops.
             //I should calc all the values and then apply the final result one time.
 
@@ -171,6 +191,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 let control_change = this.getControllerAction('changeplayer');
                 let control_dash = this.getControllerAction('dash');  
                 let control_jumphold = this.getControllerAction('jumphold');
+                let control_brake = this.getControllerAction('brake');
                 
                 //Change Player in Single Mode
                 if(playerMode == 0){
@@ -180,25 +201,48 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 }
                 if(this.light_status == brightMode){
                     this.angle = 0;
+                    let light_mv_speed = this.mv_speed;
                     //BRIGHT CONTROLS 
-                    if(control_beam && this.beamReady ){
-                        this.beamReady = false;
-                        soullight.setAimer();
-                        this.beamAbility.create(soullight.aimer.x,soullight.aimer.y,soullight.aimer.rotation);
-                    }                    
+                    if(control_dash && this.lightdashReady){
+                        if(hud.brightStatBar.getValue() > 100){
+                            this.lightdashTimer = this.scene.time.addEvent({ delay: 300, callback: this.resetLightDask, callbackScope: this, loop: false });
+                            this.lightdashReady = false; 
+                            this.addEnergy(-100);
+                        }
+                    }
+                    if(this.lightdashReady == false){
+                        //Is light dashing
+                        light_mv_speed = light_mv_speed*4;
+                    }
+                    //Old Beam
+                    // if(control_beam && this.beamReady ){
+                    //     this.beamReady = false;
+                    //     soullight.setAimer();
+                    //     this.beamAbility.create(soullight.aimer.x,soullight.aimer.y,soullight.aimer.rotation);
+                    // }      
+                    //New Beam  
+                    if(control_beam){                
+                        if(Phaser.Math.Distance.Between(this.beamPrevVec2.x,this.beamPrevVec2.y,this.x,this.y) > 2){        
+                            let lb = new Lightblock(this.scene,this.x,this.y);
+                            this.beamPrevVec2.x = this.x;
+                            this.beamPrevVec2.y = this.y;
+                            this.addEnergy(-50);
+                        }
+                    }
+                              
                     if(control_left){
-                        this.sprite.setVelocityX(-this.mv_speed);
+                        this.sprite.setVelocityX(-light_mv_speed);
                         this.flipX= true; // flip the sprite to the left
                     }
                     if(control_right){
-                        this.sprite.setVelocityX(this.mv_speed);
+                        this.sprite.setVelocityX(light_mv_speed);
                         this.flipX= false; // flip the sprite to the right
                     }
                     if (control_up) {
-                        this.sprite.setVelocityY(-this.mv_speed);
+                        this.sprite.setVelocityY(-light_mv_speed);
                     }
                     if (control_down) {
-                        this.sprite.setVelocityY(this.mv_speed);
+                        this.sprite.setVelocityY(light_mv_speed);
                     }
                     if(!control_left && !control_right && !control_up && !control_down){
                         //this.sprite.anims.play('bright-idle', true);//Idle
@@ -245,6 +289,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                                 e.grabbed();                
                             }
                         });
+
                     }
                     if(control_pulseRelease){
                         if(this.abPulse.doCharge){
@@ -305,7 +350,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
 
                     }
                     //Dark Stop
-                    if (control_down && this.airTime == 0) {
+                    if (control_brake && this.airTime == 0) {
                         let angVel = this.body.angularVelocity;
                         // if(angVel > 0){this.setAngularVelocity(angVel-.05)};
                         // if(angVel < 0){this.setAngularVelocity(angVel+.05)};
@@ -340,10 +385,15 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     }
                     //Singularity
                     if(control_pulsePress){
-                        let solAngle = Phaser.Math.Angle.Between(this.x,this.y,solana.x,solana.y);
-                        let solForce = 0.02;
-                        let solPullVec = {x:-Math.cos(solAngle)*solForce,y:-Math.sin(solAngle)*solForce};
-                        solana.applyForce(solPullVec);
+                        // let solAngle = Phaser.Math.Angle.Between(this.x,this.y,solana.x,solana.y);
+                        // let solForce = 0.02;
+                        // let solPullVec = {x:-Math.cos(solAngle)*solForce,y:-Math.sin(solAngle)*solForce};
+                        // solana.applyForce(solPullVec);
+                        if(soullight.transfer != -1 && soullight.transfer != undefined){
+                            if(Phaser.Math.Distance.Between(this.x,this.y,soullight.transfer.x,soullight.transfer.y) < soullight.freePassDistance*2){
+                                soullight.transfer.setGrabbed(this);
+                            }
+                        }
                     }
 
                     //Fake Angular Velocity friction
@@ -367,7 +417,12 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     if(this.body.velocity.y > this.max_speed.ground ){this.setVelocityY(this.max_speed.ground);};
                     if(this.body.velocity.y < -this.max_speed.ground ){this.setVelocityY(-this.max_speed.ground );};
                 }
-
+                //Body Impulse Limit
+                if(this.body.positionImpulse.x > this.max_speed.ground){this.body.positionImpulse.x = this.max_speed.ground};
+                if(this.body.positionImpulse.x < -this.max_speed.ground){this.body.positionImpulse.x = -this.max_speed.ground};
+                if(this.body.positionImpulse.y > this.max_speed.ground){this.body.positionImpulse.y = this.max_speed.ground};
+                if(this.body.positionImpulse.y < -this.max_speed.ground){this.body.positionImpulse.y = -this.max_speed.ground};
+                
                 // this.debug.setPosition(this.sprite.x, this.sprite.y-64);
                 // this.debug.setText("JumpCount:"+String(this.jumpCount)+":"+String(this.touching.down));
             }else if(curr_player==players.SOLANA && playerMode == 0){
@@ -415,6 +470,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     return (gamePad[this.ctrlDeviceId].checkButtonState('rightTrigger') == 1);
                 case 'pulseR':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('rightTrigger') == -1);
+                case 'brake':
+                    return (gamePad[this.ctrlDeviceId].checkButtonState('rightShoulder') > 0);
                 case 'changeplayer':
                     return (gamePad[this.ctrlDeviceId].checkButtonState('Y') == 1);
                 case 'dash':
@@ -448,6 +505,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     return (keyPad.checkKeyState('F') == 1);
                 case 'pulseR':
                     return (keyPad.checkKeyState('F') == -1);
+                case 'brake':
+                    return (keyPad.checkKeyState('S') > 0);
                 case 'changeplayer':
                     return (keyPad.checkKeyState('Q') == 1);
                 case 'dash':
@@ -470,6 +529,9 @@ class Bright extends Phaser.Physics.Matter.Sprite{
     }
     resetDarkDask(){
         this.darkdashReady = true;
+    }
+    resetLightDask(){
+        this.lightdashReady = true;
     }
     toDark(){
         this.light_status = 1;
@@ -550,6 +612,28 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                 
             }
         }
+    }
+    blockShot(){
+        let block_effect = this.scene.add.ellipse(this.x,this.y,this.width,this.height,0x440e52,0.3);
+        block_effect.blendMode = Phaser.BlendModes.ADD;
+        block_effect.isStroked = true;
+        block_effect.strokeColor = 0x000000;
+        block_effect.strokeAlpha = 0.5;
+        block_effect.lineWidth = 1;
+
+        let tween = this.scene.tweens.add({
+            targets: block_effect,
+            scale: 2.0,               
+            ease: 'Linear',       
+            duration: 100,  
+            onUpdate: function(tween,targets){
+
+            },
+            onComplete: function(tween, targets, c){
+                c.destroy();
+            }, 
+            onCompleteParams: [block_effect],
+        });
     }
     receiveHealth(health){
         this.hp+=health;
