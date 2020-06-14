@@ -605,10 +605,13 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
             let hurtParse = JSON.parse(this.zonedata.value);
             let gravY = hurtParse.gravY != undefined ? hurtParse.gravY : 0;
             let gravX = hurtParse.gravX != undefined ? hurtParse.gravX : 0;
+            let freq = 100-(Math.floor(w/16)*Math.floor(h/16));
+            freq = Phaser.Math.Clamp(freq,1,100);
             this.sparker = spark1.createEmitter({
                 active:true,
                 x: this.x,
                 y: this.y,
+                frequency: freq,
                 frame: {
                     frames: [
                         "circle_05"
@@ -772,7 +775,7 @@ class TMXZone extends Phaser.Physics.Matter.Sprite{
                     hud.storySpeech.createSpeech(textParse.spkImageLeft,textParse.spkImageRight,textParse.doPause);
                     textParse.speechdata.forEach(e=>{
                         hud.storySpeech.addToSpeech(e.p,e.txt,e.dur);
-                    });   
+                    });
                     hud.storySpeech.startSpeech();
                }
             }
@@ -842,7 +845,7 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
         this.sprite
         .setExistingBody(compoundBody)         
         .setCollisionCategory(CATEGORY.SOLID)
-        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET])
+        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET, CATEGORY.ENEMY])
         .setPosition(x, y)
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setStatic(true)
@@ -1026,7 +1029,7 @@ class TMXPlatform extends Phaser.Physics.Matter.Sprite{
 
     }
     oneWayEnd(){        
-        this.setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET]);
+        this.setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT, CATEGORY.DARK, CATEGORY.VEHICLE, CATEGORY.SOLID, CATEGORY.BULLET, CATEGORY.ENEMY]);
         this.onWayTracker = -1;
         this.clearTint();
     }
@@ -1162,7 +1165,7 @@ class Seesaw extends Phaser.Physics.Matter.Image {
         this
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.SOLID)
-        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.DARK, CATEGORY.SOLID, CATEGORY.GROUND])
+        .setCollidesWith([CATEGORY.SOLANA,CATEGORY.BRIGHT,CATEGORY.DARK, CATEGORY.SOLID, CATEGORY.GROUND, CATEGORY.BULLET])
         .setPosition(x, y)
         .setIgnoreGravity(true)
         .setVisible(true);  

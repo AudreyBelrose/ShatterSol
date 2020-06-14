@@ -451,51 +451,51 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "spiker"){
                 let spiker = new EnemySpiker(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0)
             }else{
-                // let EnemyType = props.enemyType;
-                // let EnemyClass = props.enemyClass;
-                // let PassiveBehavior = props.pBehav;
-                // let AggressivBehavior = props.aBehav;
-                // let weapon = props.weapon;
-                // let new_enemy;
-                // let path = '[{"x":0,"y":0}]';
-                // //Standard Types            
-                // if(EnemyClass == 'ground'){
-                //     new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
-                // }else if(EnemyClass == 'air'){
-                //     new_enemy = enemiesFly.get(tmxObjRef.x,tmxObjRef.y,EnemyType);                
-                // }else{
-                //     new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
-                // }
-                // //Set manual path if available
-                // if(props.path){
-                //     path = JSON.parse(props.path);
-                // }
-                // //Accept Pathing Objects from TMX if available
-                // if(props.pathid){
-                //     let findPath = pathingNodes.find(e => {
-                //         return e.name === props.pathid;
-                //     })
-                //     if(findPath){
-                //         path = findPath.worldpoints;
-                //     }
-                // }
-                // if(props.tint){
-                //     let newTint =  (Phaser.Display.Color.HexStringToColor(props.tint))._color; //0x333333
-                //     new_enemy.setTint(newTint);
-                // }
-                // if(props.scale){
-                //     new_enemy.setScale(props.scale);
-                // }
+                let EnemyType = props.enemyType;
+                let EnemyClass = props.enemyClass;
+                let PassiveBehavior = props.pBehav;
+                let AggressivBehavior = props.aBehav;
+                let weapon = props.weapon;
+                let new_enemy;
+                let path = '[{"x":0,"y":0}]';
+                //Standard Types            
+                if(EnemyClass == 'ground'){
+                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
+                }else if(EnemyClass == 'air'){
+                    new_enemy = enemiesFly.get(tmxObjRef.x,tmxObjRef.y,EnemyType);                
+                }else{
+                    new_enemy = enemies.get(tmxObjRef.x,tmxObjRef.y,EnemyType);
+                }
+                //Set manual path if available
+                if(props.path){
+                    path = JSON.parse(props.path);
+                }
+                //Accept Pathing Objects from TMX if available
+                if(props.pathid){
+                    let findPath = pathingNodes.find(e => {
+                        return e.name === props.pathid;
+                    })
+                    if(findPath){
+                        path = findPath.worldpoints;
+                    }
+                }
+                if(props.tint){
+                    let newTint =  (Phaser.Display.Color.HexStringToColor(props.tint))._color; //0x333333
+                    new_enemy.setTint(newTint);
+                }
+                if(props.scale){
+                    new_enemy.setScale(props.scale);
+                }
 
-                // if(new_enemy){
-                //     //Setup Enemy
-                //     new_enemy.setActive(true);
-                //     new_enemy.setVisible(true);
-                //     new_enemy.setBehavior(PassiveBehavior,AggressivBehavior,weapon);
-                //     new_enemy.setPath(path);
+                if(new_enemy){
+                    //Setup Enemy
+                    new_enemy.setActive(true);
+                    new_enemy.setVisible(true);
+                    new_enemy.setBehavior(PassiveBehavior,AggressivBehavior,weapon);
+                    new_enemy.setPath(path);
                     
                     
-                // } 
+                } 
             }
         }
         //Spawn Objects
@@ -516,7 +516,7 @@ var GameScene = new Phaser.Class({
                 mir.setup(centerPoint.x,centerPoint.y,tmxObjRef.rotation,tmxObjRef.name);
                 losBlockAndReflect.push(mir.body);
             }else if(tmxObjRef.type == "window"){  
-                let bar = barriers.get(-1000,-1000,"tmxwindow",0,true);
+                let bar = barriers.get(-1000,-1000,"glasstile",0,true);
                 let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
                 let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
                 let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
@@ -534,17 +534,16 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "platfall"){ 
                 x_offset = tmxObjRef.width/2;
                 y_offset = tmxObjRef.height/2;
-                //let newFallPlat = new Fallplat(this,tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-1);
-                let oG = -1;
-                map.tilesets.forEach(e=>{
-                    if(e.image.key == 'tiles32'){
-                        oG = e.firstgid;
-                    }
-                })
                 let platfallprops = getTileProperties(tmxObjRef.properties);
-                let pf = platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,'tiles32',tmxObjRef.gid-oG);
-                pf.setDepth(DEPTH_LAYERS.PLATFORMS);
                 if(platfallprops != undefined){
+                    let oG = -1;
+                    map.tilesets.forEach(e=>{
+                        if(e.image.key == platfallprops.tsName){
+                            oG = e.firstgid;
+                        }
+                    })   
+                    let pf = platfalls.get(tmxObjRef.x+x_offset,tmxObjRef.y-y_offset,platfallprops.tsName,tmxObjRef.gid-oG);
+                    pf.setDepth(DEPTH_LAYERS.PLATFORMS);                
                     if(platfallprops.shakeTime != undefined && platfallprops.shakeCount != undefined){
                         pf.setShakeTime(platfallprops.shakeTime,platfallprops.shakeCount);
                     }
@@ -638,9 +637,20 @@ var GameScene = new Phaser.Class({
                 polySpline.draw(g_sp1);
                 g_sp1.setDepth(DEPTH_LAYERS.FG);
             }else if(tmxObjRef.type == 'minecart'){
+                let cartprops = getTileProperties(tmxObjRef.properties);
                 let cart = new Vehicle(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2).setDepth(DEPTH_LAYERS.FRONT);
                 cart.wA.setDepth(DEPTH_LAYERS.FRONT);
                 cart.wB.setDepth(DEPTH_LAYERS.FRONT);
+                if(cartprops != undefined){
+                    if(cartprops.pathid != undefined){
+                        let findPath = pathingNodes.find(e => {
+                            return e.name === cartprops.pathid;
+                        })
+                        if(findPath){
+                            cart.path = findPath.worldpoints;
+                        }
+                    }
+                }
             }else if(tmxObjRef.type == 'decal'){
                 let genprops = getTileProperties(tmxObjRef.properties);
                 if(genprops.srctype == 'sprite'){
@@ -878,8 +888,10 @@ var GameScene = new Phaser.Class({
                       || gameObjectB instanceof BreakableTile 
                       || gameObjectB instanceof Crate 
                       || gameObjectB instanceof Seesaw 
+                      || gameObjectB instanceof ConveyorWheel 
                       || gameObjectB instanceof TMXGear
-                      || gameObjectB instanceof BrightBeamBlock)) {   
+                      || gameObjectB instanceof BrightBeamBlock
+                      || gameObjectB instanceof Lightblock)) {   
                 
                 //handle plaform jumping allowance             
                 if(bodyA.label == "BRIGHT_BOTTOM"){
@@ -977,8 +989,10 @@ var GameScene = new Phaser.Class({
                 || gameObjectB instanceof PlatSwing
                 || gameObjectB instanceof BreakableTile 
                 || gameObjectB instanceof TMXGear
-                || gameObjectB instanceof Seesaw              
-                || gameObjectB instanceof BrightBeamBlock)) {  
+                || gameObjectB instanceof Seesaw
+                || gameObjectB instanceof ConveyorWheel         
+                || gameObjectB instanceof BrightBeamBlock
+                || gameObjectB instanceof Lightblock)) {  
 
                     //handle plaform jumping allowance             
                     if(bodyA.label == "SOLANA_TOP"){
@@ -1186,6 +1200,16 @@ var GameScene = new Phaser.Class({
                     emitter0.explode(5,bulletObj.x,bulletObj.y);
                     bulletObj.hit();
                 }
+                //Between Bullets and Bright
+                if ((bodyA.label === 'BULLET' && bodyB.label === 'BRIGHT') || (bodyA.label === 'BRIGHT' && bodyB.label === 'BULLET')) {
+                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'BULLET');
+                    if (gObjs[0].active){
+                        gObjs[0].hit();
+                        let burst = light_bursts.get(gObjs[0].x,gObjs[0].y);
+                        burst.burst(gObjs[0].x,gObjs[0].y);
+                        gObjs[1].blockShot();
+                    }  
+                }
                 //Between Bullets and Solana
                 if ((bodyA.label === 'BULLET' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'BULLET')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'BULLET');
@@ -1232,14 +1256,14 @@ var GameScene = new Phaser.Class({
                 //Between Soulight and Solana
                 if ((bodyA.label === 'SOULLIGHT' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'SOULLIGHT')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULLIGHT');
-                    if (gObjs[0].active && gObjs[0].ownerid != 0){
+                    if (gObjs[0].active && gObjs[0].ownerid == 1 || gObjs[0].active && gObjs[0].ownerid == -1){
                         gObjs[0].lockLight(gObjs[1],0);
-                    }  
+                    }
                 }
                 //Between Soulight and Bright
                 if ((bodyA.label === 'SOULLIGHT' && bodyB.label === 'BRIGHT') || (bodyA.label === 'BRIGHT' && bodyB.label === 'SOULLIGHT')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULLIGHT');
-                    if (gObjs[0].active && gObjs[0].ownerid != 1){
+                    if (gObjs[0].active && gObjs[0].ownerid == 0 || gObjs[0].active && gObjs[0].ownerid == -1){
                         gObjs[0].lockLight(gObjs[1],1);
                     }  
                 }
@@ -1252,6 +1276,14 @@ var GameScene = new Phaser.Class({
                         gObjs[1].addEnergy(50);
                     }  
                 }
+                let SolBombBurnList = ['SOLID','GROUND','ROCK','BREAKABLE'];
+                if((bodyA.label == 'SOLBOMB' && SolBombBurnList.includes(bodyB.label)) || (bodyB.label == 'SOLBOMB' && SolBombBurnList.includes(bodyA.label)) ){
+                    let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOLBOMB');
+                    if (gObjs[0].active){
+                        gObjs[0].unready();
+                    }  
+                }
+
                 //Between SoulTransfer and Solana
                 if ((bodyA.label === 'SOULTRANSFER' && bodyB.label === 'SOLANA') || (bodyA.label === 'SOLANA' && bodyB.label === 'SOULTRANSFER')) {
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOULTRANSFER');
@@ -1512,32 +1544,44 @@ var GameScene = new Phaser.Class({
         };
         //Draw lighting
         var solana_in_light = false;
+        var dark_in_light = false;
         this.shadow_graphic.clear();
         this.cutGraphicRaycastPolygon(soullight.x << 0,soullight.y << 0,720);//1440
         //CENTER ON CAMERA AND CALC FOR ANY APPLICABLE OFFSETS        
         this.shadow_graphic.fillCircle(bright.x, bright.y, bright.light_radius);
 
         //Solana in Soullight Range?
-        if(Phaser.Math.Distance.Between(soullight.x,soullight.y,solana.x,solana.y) <= soullight.protection_radius.value){
+        if(distanceBetweenObjects(soullight,solana) <= soullight.protection_radius.value){
             //Can the light reach her without being blocked?
             let losRc = Phaser.Physics.Matter.Matter.Query.ray(losBlockers,{x:solana.x,y:solana.y},{x:soullight.x,y:soullight.y});
             if(losRc.length == 0){solana_in_light = true;};
         }
-        if(Phaser.Math.Distance.Between(bright.x,bright.y,solana.x,solana.y) <= bright.light_radius){solana_in_light = true;}
+        if(distanceBetweenObjects(bright,solana) <= bright.light_radius){solana_in_light = true;}
 
         let lamps = crystallamps.getChildren()
         for(var x = 0;x < lamps.length;x++){
             var lamp = lamps[x];
-            this.shadow_graphic.fillCircle(lamp.x, lamp.y, lamp.brightness);
-            if(Phaser.Math.Distance.Between(lamp.x,lamp.y,solana.x,solana.y) <= lamp.brightness){solana_in_light = true;}
+            if(lamp.active){
+                this.shadow_graphic.fillCircle(lamp.x, lamp.y, lamp.brightness);                
+                if(distanceBetweenObjects(lamp,solana) <= lamp.brightness){solana_in_light = true;}
+            }
         }
         let sbs = solbombs.getChildren();
         for(let s=0;s<sbs.length;s++){
             let sb = sbs[s];
-            this.shadow_graphic.fillCircle(sb.x, sb.y, sb.light_radius);
-            if(Phaser.Math.Distance.Between(sb.x,sb.y,solana.x,solana.y) <= sb.light_radius){solana_in_light = true;}
+            if(sb.active){
+                this.shadow_graphic.fillCircle(sb.x, sb.y, sb.light_radius);
+                if(distanceBetweenObjects(sb,solana) <= sb.light_radius){solana_in_light = true;}
+            }
         }
-
+        let lbs = light_bursts.getChildren();
+        for(let l=0;l<lbs.length;l++){
+            let lb = lbs[l];
+            if(lb.active){
+                this.shadow_graphic.fillCircle(lb.x, lb.y, 32);
+                if(distanceBetweenObjects(lb,solana) <= lb.light_radius){solana_in_light = true;}
+            }
+        }
 
         //Instead of doing damage right away, do drain energy. IF totally drained, then take damage.
         solana.inLight = solana_in_light;
@@ -1793,8 +1837,8 @@ var GameScene = new Phaser.Class({
     getGamepadVectors(gamePadID){
         if(gamePad[gamePadID]){
             //Raw Sticks Vectors
-            let stickRight = gamePad[gamePadID].getStickRight(.01);
-            let stickLeft = gamePad[gamePadID].getStickLeft(.01);
+            let stickRight = gamePad[gamePadID].getStickRight(.1);
+            let stickLeft = gamePad[gamePadID].getStickLeft(.1);
             return [stickLeft,stickRight];
         }
         
@@ -1814,6 +1858,31 @@ var GameScene = new Phaser.Class({
     },
     clearKeypad(){
         this.doKPClear = true;
+    },
+    tweenAlongSpline(spline,opt,object){
+        //Tweens with a 0 to 1 progression alone a spline
+        if(objectA){
+            let tracker = {t:0};
+            let tw = this.add.tween({
+                targets: tracker,
+                ease: 'Linear',
+                t: 1,
+                repeat: 0,
+                duration: opt.duration,
+                onUpdate: function(tween,target,spline,object){
+                    let p = spline.getPoint(target.t);
+                    object.setPosition(p.x,p.y);
+                },
+                onUpdateParams: [spline,object],
+                onComplete: function(tween, targets, scene){
+                    //On repeat, never completes
+                },
+                onCompleteParams: [this],
+                onCompleteScope: this
+            });
+        }else{
+            console.log("No Object for Tween Alone Spline call.");
+        }
     }
     
 });
@@ -2402,6 +2471,12 @@ function createAnimations(scene){
         frames: scene.anims.generateFrameNumbers('bat-1', { frames:[0,1] }),
         frameRate: 8,
         repeat: -1
+    }); 
+    scene.anims.create({
+        key: 'lightblock-death',
+        frames: scene.anims.generateFrameNumbers('lightblockdeath', { frames:[0,1,2,3,4] }),
+        frameRate: 24,
+        repeat: 0
     }); 
     
 }

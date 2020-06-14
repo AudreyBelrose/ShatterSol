@@ -30,12 +30,14 @@ class SoulLight extends Phaser.Physics.Matter.Sprite{
             .setPosition(config.x, config.y)
             .setIgnoreGravity(true);
 
+        this.sprite.setFriction(0.3,0.3);
+
         this.setDepth(DEPTH_LAYERS.PLAYERS-1);
         this.owner = owner.sprite;
 
         this.ownerid = 0;
         this.claimed = false; // No one owns it at the begining of the game. This prevents passing it around.
-
+        this.isLost = false;
         this.debug = this.scene.add.text(this.x, this.y-16, 'SoulLight', { resolution:2, fontSize: '10px', fill: '#00FF00' }).setOrigin(0.5);              
         this.passing = false;  
         this.threshhold_distance = 64;  
@@ -44,8 +46,6 @@ class SoulLight extends Phaser.Physics.Matter.Sprite{
         this.max_speed = 50;//25 
         this.accel = 1;
         this.projectile_speed = 8;//14
-        this.sprite.setFriction(.3,.3);
-        this.sprite.setIgnoreGravity(true);
         this.protection_radius = {value:200, max: 200, original: 250};//How much does the light protect;
         this.protection_circle = new Phaser.Geom.Circle(config.x, config.y, 250);
         this.throw = {x:0,y:0};
@@ -145,12 +145,16 @@ class SoulLight extends Phaser.Physics.Matter.Sprite{
                 }
 
             }else{
-                this.setPosition(this.owner.x,this.owner.y);            
+                if(this.ownerid != -1){
+                    this.setPosition(this.owner.x,this.owner.y);            
+                }
             }
         }else{
             //Home in on target
-            let target = this.ownerid == 0 ? bright : solana;
-            this.homeLight(target);
+            if(this.ownerid != -1){
+                let target = this.ownerid == 0 ? bright : solana;
+                this.homeLight(target);
+            }
 
         }
         
@@ -373,6 +377,12 @@ class SoulLight extends Phaser.Physics.Matter.Sprite{
         this.scene.particle_soulight.setActive(true);
         this.setVisible(true);
     }
+    lose(){
+        //Light is lost and needs to be reclaimed
+        this.isLost = true;
+        this.ownerid = -1;
+        this.passing = true;
+    }
 
 }
 //Soul Transfer is the "Bullet" that will hit before the Soulight can transfer.
@@ -578,7 +588,7 @@ class Solbit{
         }
         this.aquired = true;
 
-        hud.storySpeech.createSpeech('hud_solana_head','hud_bright_head',false);
+        hud.storySpeech.createSpeech('hud_solana_head','hud_bright_head',false);        
         hud.storySpeech.addToSpeech('center',this.description,3000);
         hud.storySpeech.startSpeech();
     }

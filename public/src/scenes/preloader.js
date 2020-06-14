@@ -104,8 +104,8 @@ var Preloader = new Phaser.Class({
 		this.load.image('PF_SET2_v1_0_background_night4', 'tmx/tilesets/PF_SET2_v1.0/background_night4.png');
 		this.load.image('PF_SET3_v1_0_background1', 'tmx/tilesets/PF_SET3_v1.0/background1.png');
 		this.load.image('PF_SET3_v1_0_background2', 'tmx/tilesets/PF_SET3_v1.0/background2.png');
-		this.load.image('PF_SET3_v1_0_background3', 'tmx/tilesets/PF_SET3_v1.0/background3.png');
-		this.load.image('PF_SET3_v1_0_background4', 'tmx/tilesets/PF_SET3_v1.0/background4.png');
+		this.load.image('PF_SET3_v1_0_background3', 'tmx/tilesets/PF_SET3_v1.0/background3a.png');
+		this.load.image('PF_SET3_v1_0_background4', 'tmx/tilesets/PF_SET3_v1.0/background4a.png');
 		this.load.image('PF_Set4_v1_0_background1_day', 'tmx/tilesets/PF_Set4_v1.0/background1_day.png');
 		this.load.image('PF_Set4_v1_0_background1_night', 'tmx/tilesets/PF_Set4_v1.0/background1_night.png');
 		this.load.image('PF_Set4_v1_0_background2A_day', 'tmx/tilesets/PF_Set4_v1.0/background2A_day.png');
@@ -258,7 +258,7 @@ var Preloader = new Phaser.Class({
 		this.load.spritesheet('breakables', 'assets/objects/breakables.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('burstwave', 'assets/objects/burstwave1.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('sol_pieces', 'assets/objects/Sol_pieces.png', {frameWidth: 64, frameHeight: 64});
-		this.load.spritesheet('breakablecracks', 'assets/objects/breakablecracks.png', {frameWidth: 32, frameHeight: 32});	
+		this.load.spritesheet('breakablecracks', 'assets/objects/breakablecracks.png', {frameWidth: 16, frameHeight: 16});	
 		this.load.spritesheet('bright_pulse', 'assets/characters/pulseV2.png', {frameWidth: 48, frameHeight: 48});
 		this.load.spritesheet('telebeam', 'assets/objects/telebeam.png', {frameWidth: 64, frameHeight: 64});
 		this.load.spritesheet('window_shatter', 'assets/objects/window_shatter.png', {frameWidth: 64, frameHeight: 96});
@@ -308,10 +308,11 @@ var Preloader = new Phaser.Class({
 		this.load.image('triggerzone', 'assets/objects/triggerzone.png');
 		this.load.image('speechbubble', 'assets/hud/speechBubble.png');
 		this.load.image('tmxwindow', 'assets/objects/tmxwindow.png');
+		this.load.image('glasstile', 'assets/objects/glasstile.png');
 		this.load.image('mushroom1', 'assets/objects/mushroom_1.png');
 		this.load.image('grinder', 'assets/objects/grinder.png');
 		this.load.image('conveyor_wheel', 'assets/objects/conveyor_wheel.png');
-		this.load.image('oilblob2', 'assets/objects/oil_blob2.png');
+		this.load.spritesheet('oilblob2', 'assets/objects/oil_blob2.png',{frameWidth: 16, frameHeight: 16});
 		// - HUD
 		this.load.spritesheet('health_blip', 'assets/hud/health_blip.png',{frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('hud_interaction_control_arrows','assets/hud/hud_interaction_control_arrows.png',{frameWidth: 32, frameHeight: 32});
@@ -339,6 +340,8 @@ var Preloader = new Phaser.Class({
 		this.load.image('droplet', 'assets/effects/water/droplet.png');
 		this.load.image('water', 'assets/effects/water/water.jpg');
 		this.load.image('liquiddroplet', 'assets/objects/droplet.png');
+		this.load.spritesheet('lightblock', 'assets/objects/lightblock.png',{frameWidth: 2, frameHeight: 2});
+		this.load.spritesheet('lightblockdeath', 'assets/objects/lightblockdeath.png',{frameWidth: 16, frameHeight: 16});
 
 		// font
 		this.load.bitmapFont('fontwhite', 'img/fontwhite.png', 'img/fontwhite.xml');
