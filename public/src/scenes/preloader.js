@@ -162,6 +162,14 @@ var Preloader = new Phaser.Class({
 		this.load.tilemapTiledJSON('map6', 'assets/world/map6_32ts.json');
 		this.load.tilemapTiledJSON('map7', 'assets/world/map7_32ts.json');
 		this.load.tilemapTiledJSON('map8', 'assets/world/map8_32ts.json');
+		//Map Assets - Intro levels
+		this.load.tilemapTiledJSON('i1s1', 'assets/world/i1s1.json');
+		this.load.tilemapTiledJSON('i1s1a', 'assets/world/i1s1a.json');
+		this.load.tilemapTiledJSON('i1s1b', 'assets/world/i1s1b.json');
+		this.load.tilemapTiledJSON('i1s2', 'assets/world/i1s2.json');
+		this.load.tilemapTiledJSON('i1s3', 'assets/world/i1s3.json');
+		this.load.tilemapTiledJSON('i1s4', 'assets/world/i1s4.json');
+		this.load.tilemapTiledJSON('i1s5', 'assets/world/i1s5.json');
 		//Map Assets - Game		
 		this.load.tilemapTiledJSON('m1s1', 'assets/world/m1s1.json');
 		this.load.tilemapTiledJSON('m1s1a', 'assets/world/m1s1a.json');
@@ -267,11 +275,17 @@ var Preloader = new Phaser.Class({
         this.load.spritesheet('gear', 'assets/objects/gear.png', {frameWidth: 16, frameHeight: 16});
         this.load.spritesheet('minecart', 'assets/objects/minecart.png', {frameWidth: 96, frameHeight: 48});
 		this.load.spritesheet('minecart_wheel', 'assets/objects/minecart_wheel.png', {frameWidth: 13, frameHeight: 13});
-        this.load.image('seesaw', 'assets/objects/seesaw.png');
+		this.load.image('seesaw', 'assets/objects/seesaw.png');
+		//Interactive Objects
+		//Light Bridge / Sollink		
+        this.load.spritesheet('sollink', 'assets/objects/sollink.png', {frameWidth: 32, frameHeight: 32});
+        this.load.spritesheet('solanchor', 'assets/objects/solanchor.png', {frameWidth: 32, frameHeight: 32});
 		//Props
 		this.load.spritesheet('fan-1', 'assets/objects/fan-1.png', {frameWidth: 64, frameHeight: 32});
 		this.load.spritesheet('inchworm-1', 'assets/objects/props_inchworm.png', {frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('bat-1', 'assets/objects/props_bat.png', {frameWidth: 32, frameHeight: 16});
+		this.load.spritesheet('spiderweb-1', 'assets/objects/prop_spiderweb.png', {frameWidth: 32, frameHeight: 32});
+		this.load.spritesheet('puddle-1', 'assets/objects/prop_puddle1.png', {frameWidth: 32, frameHeight: 16});
 		//SoulCrystals
 		this.load.spritesheet('soulcrystal_blue', 'assets/objects/crystal-qubodup-ccby3-32-blue.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('soulcrystal_grey', 'assets/objects/crystal-qubodup-ccby3-32-grey.png', {frameWidth: 32, frameHeight: 32});		
@@ -291,6 +305,9 @@ var Preloader = new Phaser.Class({
 		//Enemies		
 		this.load.spritesheet('shrieker', 'assets/objects/mushroom_2.png', {frameWidth: 32, frameHeight: 32});
 		this.load.spritesheet('spiker', 'assets/objects/spiker_1.png', {frameWidth: 32, frameHeight: 32});
+		this.load.spritesheet('oilblob2', 'assets/objects/oil_blob2.png',{frameWidth: 16, frameHeight: 16});
+		this.load.spritesheet('statue', 'assets/characters/statue3.png',{frameWidth: 32, frameHeight: 48});
+		this.load.spritesheet('shadow1', 'assets/characters/enemy_shadow2.png',{frameWidth: 48, frameHeight: 64});
 		//Controller
 		this.load.image('icon_kb_spcbar', 'assets/UI/Keyboard_Mouse/Dark/Keyboard_Black_Space.png');
 		
@@ -312,7 +329,6 @@ var Preloader = new Phaser.Class({
 		this.load.image('mushroom1', 'assets/objects/mushroom_1.png');
 		this.load.image('grinder', 'assets/objects/grinder.png');
 		this.load.image('conveyor_wheel', 'assets/objects/conveyor_wheel.png');
-		this.load.spritesheet('oilblob2', 'assets/objects/oil_blob2.png',{frameWidth: 16, frameHeight: 16});
 		// - HUD
 		this.load.spritesheet('health_blip', 'assets/hud/health_blip.png',{frameWidth: 16, frameHeight: 16});
 		this.load.spritesheet('hud_interaction_control_arrows','assets/hud/hud_interaction_control_arrows.png',{frameWidth: 32, frameHeight: 32});
@@ -341,6 +357,7 @@ var Preloader = new Phaser.Class({
 		this.load.image('water', 'assets/effects/water/water.jpg');
 		this.load.image('liquiddroplet', 'assets/objects/droplet.png');
 		this.load.spritesheet('lightblock', 'assets/objects/lightblock.png',{frameWidth: 2, frameHeight: 2});
+		this.load.spritesheet('lightblock2', 'assets/objects/lightblock2.png',{frameWidth: 8, frameHeight: 8});
 		this.load.spritesheet('lightblockdeath', 'assets/objects/lightblockdeath.png',{frameWidth: 16, frameHeight: 16});
 
 		// font
@@ -351,6 +368,11 @@ var Preloader = new Phaser.Class({
 		this.load.audio('coin', ['snd/coin.mp3', 'snd/coin.ogg']);
 		this.load.audio('bomb', ['snd/expl.mp3', 'snd/expl.ogg']);
 		this.load.audio('btn',  ['snd/btn.mp3', 'snd/btn.ogg']);
+		//HUD		
+		this.load.audio('spblip_1',  ['snd/hud/speech_blip_1.wav']);
+		this.load.audio('spblip_2',  ['snd/hud/speech_blip_2.wav']);
+		this.load.audio('spblip_3',  ['snd/hud/speech_blip_3.wav']);
+		this.load.audio('spblip_4',  ['snd/hud/speech_blip_4.wav']);
 		//this.load.audio('jumpSolana',  ['snd/jump1.mp3']);
 		this.load.audio('grabbedLight',  ['snd/grabbed.wav']);
 		this.load.audio('jumpSolana',  ['snd/jumpland.wav']);
@@ -360,6 +382,10 @@ var Preloader = new Phaser.Class({
 		this.load.audio('hitting_wall',  ['snd/Hitting_Wall.wav']);
 		this.load.audio('wavingtorch',  ['snd/WavingTorch.wav']);
 		this.load.audio('shard1',  ['snd/shard1.wav']);
+		//Bright
+		this.load.audio('block1',  ['snd/bright/blockProjectile1.wav']);
+		
+		//Music
 		this.load.audio('theme1',  ['snd/theme1.wav']);
 		this.load.audio('intro1',  ['snd/intro1.ogg']);
 		this.load.audio('forestTheme1',  ['snd/safe_room_theme.ogg']);

@@ -9,8 +9,8 @@ class Mirror extends Phaser.Physics.Matter.Sprite{
 
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         const { width: w, height: h } = this.sprite;
-        const mainBody =  Bodies.rectangle(0, 0, w, h*0.5);
-        
+        const mainBody =  Bodies.rectangle(0, 0, w, h*0.25);
+
         const compoundBody = Body.create({
             parts: [mainBody],
             frictionStatic: 1,//0.0
@@ -136,7 +136,7 @@ class TMXGear extends Phaser.Physics.Matter.Image{
         this.setActive(true);
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         //Set Control Sensor - Player can't collide with mirrors, but bullets can. Sensor can detect player inputs.
-        const body =  Bodies.circle(0, 0, this.width*0.50);
+        const body =  Bodies.circle(0, 0, this.width*0.50, {isSensor:true});
         // const prongLeft = Bodies.rectangle(-this.width/2, -this.height/2, this.width*0.10,this.height*0.50);
         // const prongRight = Bodies.rectangle(this.width/2, -this.height/2, this.width*0.10,this.height*0.50);
         // prongLeft.angle += Math.PI/4;
@@ -155,6 +155,45 @@ class TMXGear extends Phaser.Physics.Matter.Image{
         .setIgnoreGravity(true)  
         .setVisible(false);
 
+        this.scene.matterCollision.addOnCollideActive({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Bright) {
+                    if(gameObjectB.light_status == 1){
+                        //Dark Mode only
+                        let control_interact = bright.ctrlDeviceId >= 0? gamePad[bright.ctrlDeviceId].checkButtonState('up') == 1 : keyPad.checkKeyState('W') == 1;
+                        if(control_interact){
+                            if(!gameObjectA.darkAttached){
+                                console.log("dark attach to gear");
+                                gameObjectA.attachDark();
+                            }else{
+                                console.log("dark detach from gear");
+                                gameObjectA.detachDark();
+                            }
+                        }
+                        
+                    }
+                }
+            }
+        });
+        
+        this.scene.matterCollision.addOnCollideEnd({
+            objectA: [this],
+            callback: eventData => {
+                const { bodyB, gameObjectB,bodyA,gameObjectA } = eventData;
+                
+                if (gameObjectB !== undefined && gameObjectB instanceof Bright) {
+                    if(gameObjectB.light_status == 1){
+                        gameObjectA.darkAttached = false;
+                    }
+                }
+            }
+        });
+        this.darkAttached = false;
+
+
     }
     setup(x,y,properties,name,w,h){
         this.setActive(true);        
@@ -165,7 +204,7 @@ class TMXGear extends Phaser.Physics.Matter.Image{
         this.ready = true;
         this.target = {name: -1,type: -1, object: []};
 
-        let rotation_constraint = Phaser.Physics.Matter.Matter.Constraint.create(
+        this.rotation_constraint = Phaser.Physics.Matter.Matter.Constraint.create(
             {
               pointA: { x: this.x, y: this.y },
               bodyB: this.body,
@@ -173,13 +212,24 @@ class TMXGear extends Phaser.Physics.Matter.Image{
               stiffness: 1
             }
           );
-        this.scene.matter.world.add(rotation_constraint);
+        this.scene.matter.world.add(this.rotation_constraint);
         if(properties){
             this.target.name = properties.targetName;
         }
         this.prevAng = 0;
         
-        this.debug = this.scene.add.text(this.x, this.y-16, 'plate', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5);  
+        this.debug = this.scene.add.text(this.x, this.y-16, 'plate', { fontSize: '10px', fill: '#00FF00', resolution: 2 }).setOrigin(0.5).setDepth(this.depth+1);  
+    }
+    attachDark(){
+        this.darkAttached = true;
+        bright.setFrictionAir(0.9);
+        this.attachConstraint = this.scene.matter.add.constraint(this,bright,0,1.0);
+    }
+    detachDark(){
+        if(this.attachConstraint != undefined){
+            bright.setFrictionAir(0.01);
+            this.scene.matter.world.remove(this.attachConstraint);
+        }
     }
     setTarget(targetObject){
         this.target.object.push(targetObject);
@@ -196,7 +246,9 @@ class TMXGear extends Phaser.Physics.Matter.Image{
         let roc = ~~(this.angle - this.prevAng);
         this.debug.setPosition(this.x, this.y-16);
         this.debug.setText("Data:"+String(this.angle.toFixed(2))+'roc:'+String(roc));
-
+        if(this.darkAttached){
+            this.setAngularVelocity(bright.body.angularVelocity*0.50); 
+        }
         if(roc > 1){
             this.triggerTarget(1);
         }else if(roc < -1){

@@ -61,7 +61,7 @@
     
     //Globals
     //Global Game Access
-    var buildVersion = "a-5-29-2020";
+    var buildVersion = "a-7-10-2020";
     var game;
     var hud;
     var playScene;
@@ -71,8 +71,8 @@
     //Tiles
     var map; 
     var mapTileSize = {tw:16,th:16};
-    var current_map = "m2s4";
-    var current_exit = {solana: "west1", bright: "west1"};
+    var current_map = "i1s1";
+    var current_exit = {solana: "west1a", bright: "west1b"};
     var world_backgrounds = [];
         
     //Game Objects
@@ -150,8 +150,8 @@
         SHIELD: 2048,
         BOSS: 4096,
         VEHICLE: 8192,
-        LIQUID: 16384
-
+        LIQUID: 16384,
+        INTERACTIVE: 32768
     }
     const DEPTH_LAYERS = {
         BG: 10,

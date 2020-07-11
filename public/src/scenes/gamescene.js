@@ -45,7 +45,7 @@ var GameScene = new Phaser.Class({
         let lvlCfg = getLevelConfigByName(this,current_map);
         //Create Background - This will need to be custom based on the map.
         lvlCfg.backgrounds.forEach(e=>{
-            world_backgrounds.push(this.add.tileSprite(512, 256, map.widthInPixels*2, map.heightInPixels*2, e));
+            world_backgrounds.push(this.add.tileSprite(map.widthInPixels/2, map.heightInPixels/2, map.widthInPixels*2, map.heightInPixels, e));
         });
         
         var tilesetImages = [];
@@ -102,7 +102,7 @@ var GameScene = new Phaser.Class({
         //Clear Light Polygons
         lightPolygons = [];
         //Generate shadow canvas
-        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.7).setDepth(DEPTH_LAYERS.PLAYERS);
+        this.shadow_background =  this.add.rectangle(0,0,map.widthInPixels*2, map.heightInPixels*2,0x000000,0.4).setDepth(DEPTH_LAYERS.PLAYERS);
         this.shadow_graphic = this.make.graphics();    
         this.shadow_graphic.setPosition(0,0);        
         this.shadow_mask = this.shadow_graphic.createGeometryMask();
@@ -115,6 +115,7 @@ var GameScene = new Phaser.Class({
         this.matter.world.drawDebug = true;        
         this.worldGrid = this.add.grid(0,0,map.widthInPixels*2,map.heightInPixels*2,16,16,0x333333,0.1,0x000000,0.8).setOrigin(0);
         this.worldGrid.setVisible(false);
+        this.worldGrid.setDepth(DEPTH_LAYERS.FG);
         //Add Labels for tile bodies for easier collision management
         this.collisionLayer.forEachTile(function (tile) {
             // In Tiled, the platform tiles have been given a "type" property which is a string
@@ -207,7 +208,7 @@ var GameScene = new Phaser.Class({
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);  
         this.cameras.main.setBackgroundColor('#000000'); 
         this.cameras.main.roundPixels = true;
-        this.cameras.main.setZoom(2);
+        this.cameras.main.setZoom(1.75);
         camera_main = this.cameras.main;
         this.camMovement = {x:camera_main.worldView.x,y:camera_main.worldView.y};
 
@@ -439,7 +440,7 @@ var GameScene = new Phaser.Class({
                 spider.setPosition(tmxObjRef.x,tmxObjRef.y);
             }else if(tmxObjRef.type == "shrieker"){
                 let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
-                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
+                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
                 let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
                 if(tmxObjRef.rotation != 0){      
                     Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
@@ -449,7 +450,13 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "blob"){
                 let blobC = new EnemyBlobC(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2,tmxObjRef.width,tmxObjRef.height);
             }else if(tmxObjRef.type == "spiker"){
-                let spiker = new EnemySpiker(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0)
+                let spiker = new EnemySpiker(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0);
+            }else if(tmxObjRef.type == "statue"){
+                let statue = new EnemyStatue(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0);
+            }else if(tmxObjRef.type == "blip"){
+                let blip = new EnemyBlip(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0);
+            }else if(tmxObjRef.type == "shadow"){
+                let shadow = new EnemyShadow(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2,0);
             }else{
                 let EnemyType = props.enemyType;
                 let EnemyClass = props.enemyClass;
@@ -508,7 +515,8 @@ var GameScene = new Phaser.Class({
             if(tmxObjRef.type == "mirror"){  
                 let mir = mirrors.get();
                 let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
-                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
+                //Was for texture:  let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y-tmxObjRef.height/2);
+                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
                 let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
                 if(tmxObjRef.rotation != 0){      
                     Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
@@ -614,28 +622,7 @@ var GameScene = new Phaser.Class({
                 let chestProps = getTileProperties(tmxObjRef.properties);
                 let chest = new Chest(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
             }else if(tmxObjRef.type == 'line'){
-                
-                let g_sp1 = this.add.graphics();
-                g_sp1.setPosition(tmxObjRef.x,tmxObjRef.y);
-                g_sp1.lineStyle(4, 0x000000, 1.0);
-                // let spl = new Phaser.Curves.Spline(tmxObjRef.polyline);
-                // spl.draw(g_sp1);
-                let polyPath =  new Phaser.Curves.Path();
-                let polySpline =  new Phaser.Curves.Spline(tmxObjRef.polyline);
-                tmxObjRef.polyline.forEach((e,i)=>{
-                    if(i==0){
-                        polyPath.moveTo(e);
-                    }else{
-                        polyPath.lineTo(e);
-                    };
-                });
-
-
-                //polyPath.draw(g_sp1);
-                polySpline.draw(g_sp1);
-                g_sp1.lineStyle(2, 0x444444, 0.8);
-                polySpline.draw(g_sp1);
-                g_sp1.setDepth(DEPTH_LAYERS.FG);
+                let pc = new PowerCable(tmxObjRef.x,tmxObjRef.y,tmxObjRef.polyline,this);
             }else if(tmxObjRef.type == 'minecart'){
                 let cartprops = getTileProperties(tmxObjRef.properties);
                 let cart = new Vehicle(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2).setDepth(DEPTH_LAYERS.FRONT);
@@ -676,7 +663,15 @@ var GameScene = new Phaser.Class({
                     let propBat = new PropBat(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
                 }else if(propprops.subtype == 'inchworm'){
                     let propWorm = new PropInchworm(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+                }else if(propprops.subtype == 'web'){
+                    let propWeb = new PropWeb(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+                }else if(propprops.subtype == 'puddle'){
+                    let proppuddle = new PropPuddle(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
                 }
+            }else if(tmxObjRef.type == 'sollink'){
+                let sl = new Sollink(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2)
+            }else if(tmxObjRef.type == 'solanchor'){
+                let sa = new Solanchor(this,tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2)
             }
         }
         //Spawn Triggers
@@ -706,10 +701,20 @@ var GameScene = new Phaser.Class({
             }else if(tmxObjRef.type == "gear"){                
                 triggerObj = gears.get();
             }else if(tmxObjRef.type == "seesaw"){ 
-                let seesaw = new Seesaw(this,tmxObjRef.x+trig_x_offset,tmxObjRef.y+trig_y_offset,trig_props.balanceOffset);
+                //Handle Rotation Data. // Might want to turn this into a function since I use it a lot.
+                let tmxOrigin = {x:tmxObjRef.x,y:tmxObjRef.y};
+                let centerPoint = new Phaser.Geom.Point(tmxObjRef.x+tmxObjRef.width/2,tmxObjRef.y+tmxObjRef.height/2);
+                let rotRad = Phaser.Math.DegToRad(tmxObjRef.rotation);
+                if(tmxObjRef.rotation != 0){      
+                    Phaser.Math.RotateAround(centerPoint,tmxOrigin.x,tmxOrigin.y,rotRad);
+                }  
+                //End Rotation Data
+                let seesaw = new Seesaw(this,centerPoint.x,centerPoint.y,trig_props.balanceOffset);                
                 seesaw.setDensity(0.025);
+                if(trig_props.frictionAir != undefined){seesaw.setFrictionAir(trig_props.frictionAir);};
                 seesaw.setDisplaySize(tmxObjRef.width, tmxObjRef.height);
                 seesaw.setSize(tmxObjRef.width, tmxObjRef.height);
+                seesaw.setRotation(rotRad);
             }
             if(triggerObj){
                 triggerObj.setup(tmxObjRef.x+trig_x_offset,tmxObjRef.y+trig_y_offset,trig_props,tmxObjRef.name,tmxObjRef.width,tmxObjRef.height);
@@ -891,7 +896,7 @@ var GameScene = new Phaser.Class({
                       || gameObjectB instanceof ConveyorWheel 
                       || gameObjectB instanceof TMXGear
                       || gameObjectB instanceof BrightBeamBlock
-                      || gameObjectB instanceof Lightblock)) {   
+                      || gameObjectB instanceof LightblockLarge)) {   
                 
                 //handle plaform jumping allowance             
                 if(bodyA.label == "BRIGHT_BOTTOM"){
@@ -992,7 +997,7 @@ var GameScene = new Phaser.Class({
                 || gameObjectB instanceof Seesaw
                 || gameObjectB instanceof ConveyorWheel         
                 || gameObjectB instanceof BrightBeamBlock
-                || gameObjectB instanceof Lightblock)) {  
+                || gameObjectB instanceof LightblockLarge)) {  
 
                     //handle plaform jumping allowance             
                     if(bodyA.label == "SOLANA_TOP"){
@@ -1276,12 +1281,15 @@ var GameScene = new Phaser.Class({
                         gObjs[1].addEnergy(50);
                     }  
                 }
+                //Doing a lot of double checking here. I need to move a lot of these checks into the object classes.
                 let SolBombBurnList = ['SOLID','GROUND','ROCK','BREAKABLE'];
                 if((bodyA.label == 'SOLBOMB' && SolBombBurnList.includes(bodyB.label)) || (bodyB.label == 'SOLBOMB' && SolBombBurnList.includes(bodyA.label)) ){
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'SOLBOMB');
-                    if (gObjs[0].active){
-                        gObjs[0].unready();
-                    }  
+                    if(gObjs[0] != undefined){
+                        if (gObjs[0].active){
+                            gObjs[0].unready();
+                        }  
+                    }
                 }
 
                 //Between SoulTransfer and Solana
@@ -1326,7 +1334,17 @@ var GameScene = new Phaser.Class({
                     let gObjs = getGameObjectBylabel(bodyA,bodyB,'MIRROR');
                     if (gObjs[0].active){
                         gObjs[0].hit();
-                        //console.log("Mirror/ST Evt Data:",event.pairs[i]);
+                        //Not working yet.
+                        // let angB2 = Phaser.Math.Angle.Between(gObjs[0].x,gObjs[0].y,gObjs[1].x,gObjs[1].y);
+                        // let angB2_norm = Phaser.Math.Angle.Normalize(angB2);
+                        // let mirRot_norm = Phaser.Math.Angle.Normalize(gObjs[0].rotation);
+                        // let normDiff = Math.abs(mirRot_norm - angB2_norm);
+                        // let normDiffDeg = Phaser.Math.RadToDeg(normDiff);
+                        // //console.log("Impact Angle to Center of Mirror",Phaser.Math.RadToDeg(angB2_norm),Phaser.Math.RadToDeg(mirRot_norm),normDiffDeg);
+                        // if(normDiffDeg > 0 && normDiffDeg < 180){
+                        //     //console.log("BURN");
+                        //     gObjs[1].burn();
+                        // }
                     }  
                 }
                 //Solana and Fireflies
@@ -1431,14 +1449,14 @@ var GameScene = new Phaser.Class({
         this.debugPointer.lineStyle(thickness, color, alpha);
         //this.pointerDraw.strokeRect(pointer.worldX-16, pointer.worldX-16, 32, 32);
         this.debugPointer.strokeRect(0,0,16,16);
-
+        this.debugPointer.setDepth(DEPTH_LAYERS.FG);
         //Probably need a statemachine like I have for gamePad for the keyboard and mouse controls to have them update in the game scene. Mouse2 is sticking on jump
 
         //Debug Properties
         this.debugAimLine = this.add.graphics(0, 0);
         //Need to push all debug graphics into a single debug array for easy enable
         this.cameraLevel = 1;
-
+        this.debugAimLine.setDepth(DEPTH_LAYERS.FG);
         //Lights2d
         // solana.setPipeline('Light2D');
         // let light  = this.lights.addLight(0, 0, 200).setScrollFactor(0.0).setIntensity(2);
@@ -1673,7 +1691,7 @@ var GameScene = new Phaser.Class({
             let paraMove = camMvdiff < 0 ? -1 : 1;
             for(let i=0;i < world_backgrounds.length;i++){
                 let mvVal = (0.10+(0.10*i))*paraMove;
-                world_backgrounds[i].tilePositionX += mvVal;
+                world_backgrounds[i].tilePositionX -= mvVal;
             }
            
         }   
@@ -1736,7 +1754,7 @@ var GameScene = new Phaser.Class({
     cutGraphicRaycastPolygon(x,y,range){
         //Only Run the create light polygon if there is an position update, otherwise use the old polygon.
         //This should save resources
-        if(this.visiblityPolygon.x != x || this.visiblityPolygon.y != y){
+        if(this.visiblityPolygon.x != x || this.visiblityPolygon.y != y || soullight.isShrinking || soullight.protection_circle.dirty){
             let shapes = [];
             lightPolygons.forEach(function(e){
                 let d = Phaser.Math.Distance.Between(x,y,e[0][0],e[0][1]);
@@ -1837,8 +1855,8 @@ var GameScene = new Phaser.Class({
     getGamepadVectors(gamePadID){
         if(gamePad[gamePadID]){
             //Raw Sticks Vectors
-            let stickRight = gamePad[gamePadID].getStickRight(.1);
-            let stickLeft = gamePad[gamePadID].getStickLeft(.1);
+            let stickRight = gamePad[gamePadID].getStickRight(0.05);
+            let stickLeft = gamePad[gamePadID].getStickLeft(0.05);
             return [stickLeft,stickRight];
         }
         
@@ -1901,6 +1919,30 @@ function playResume(){
 function distanceBetweenObjects(a,b){
     //returns distance between two game objects
     return Phaser.Math.Distance.Between(a.x,a.y,b.x,b.y);
+}
+/**
+ * A raycast looking function using the matter query raycast to check for line of sight.
+ * @param {*} source  A game object with an x and y property who is looking
+ * @param {*} target  A game object with an x and y property who is being looked at
+ * @param {*} blockers  An arrayb of game objects that block line of sight. Has to be pushed into in the game scene builder
+ */
+function canSee(source,target,blockers){
+    let rayTo = Phaser.Physics.Matter.Matter.Query.ray(blockers,{x:source.x,y:source.y},{x:target.x,y:target.y});
+    if(rayTo.length < 1){
+        return true;
+    }else{
+        return false;
+    }
+    
+}
+function checkWithinMap(x,y){
+    let outzone = {x:0,y:0}
+    if(x < 0){outzone.x = -1;}//Left
+    if(x > map.widthInPixels){outzone.x = 1;}//Right
+    if(y < 0){outzone.y = -1;}//Top
+    if(y > map.heightInPixels){outzone.y = 1;}//Bottom
+
+    return outzone;
 }
 function getObjectTilePosition(x,y,ts){
     return {x: Math.floor(x/ts),y: Math.floor(y/ts)};
@@ -1968,6 +2010,29 @@ function setupTriggerTargets(triggerGroup,triggerGroupName,scene){
 
         }
     }, this);
+}
+/**
+ * Using Tween, causes a game object to shake. This can break physics, so be careful with high intensity. This will not take other tweens into account
+ * @param {*} scene The game scene
+ * @param {*} object The game object to shake.
+ * @param {*} intensity How many pixels to shake by, more pixels makes it more violent
+ * @param {*} dur How long to shake for each count
+ * @param {*} count How many times to shake
+ * @param {*} callback on Complete Callback, refernces the game object (tween,targets,object)
+ */
+function shakeGameObject(scene,object,intensity,dur,count,callback){
+    let tween = scene.tweens.add({
+        targets: object,
+        x: object.x+intensity,               // '+=100'
+        y: object.y+intensity,               // '+=100'
+        ease: 'Bounce.InOut',       // 'Cubic', 'Elastic', 'Bounce', 'Back'
+        duration: dur,
+        repeat: count,            // -1: infinity
+        yoyo: true,
+        onComplete:callback,
+        onCompleteParams: [object],
+    });
+    return tween;
 }
 function damageEnemy(enemy, bullet) {  
     // only if both enemy and bullet are alive
@@ -2473,10 +2538,46 @@ function createAnimations(scene){
         repeat: -1
     }); 
     scene.anims.create({
+        key: 'spiderweb-flee',
+        frames: scene.anims.generateFrameNumbers('spiderweb-1', { frames:[0,1,2,3,4,5,6,7,8] }),
+        frameRate: 8,
+        repeat: 0
+    }); 
+    scene.anims.create({
+        key: 'spiderweb-wind',
+        frames: scene.anims.generateFrameNumbers('spiderweb-1', { frames:[0,1,2,2,2,2,2,1,0] }),
+        frameRate: 8,
+        repeat: -1
+    });
+    scene.anims.create({
+        key: 'puddle-wave',
+        frames: scene.anims.generateFrameNumbers('puddle-1', { frames:[0,1,2,3,4,5,6,0] }),
+        frameRate: 8,
+        repeat: 0
+    });
+    scene.anims.create({
         key: 'lightblock-death',
         frames: scene.anims.generateFrameNumbers('lightblockdeath', { frames:[0,1,2,3,4] }),
         frameRate: 24,
         repeat: 0
-    }); 
+    });     
+    scene.anims.create({
+        key: 'sollink-active',
+        frames: scene.anims.generateFrameNumbers('sollink', { frames:[0,1,2,3,4] }),
+        frameRate: 24,
+        repeat: -1
+    });     
+    scene.anims.create({
+        key: 'status-blink',
+        frames: scene.anims.generateFrameNumbers('statue', { frames:[0,1,2,3] }),
+        frameRate: 4,
+        repeat: -1
+    });    
+    scene.anims.create({
+        key: 'shadow-death',
+        frames: scene.anims.generateFrameNumbers('shadow1', { frames:[6,7,8,9,10] }),
+        frameRate: 8,
+        repeat: 0
+    });
     
 }

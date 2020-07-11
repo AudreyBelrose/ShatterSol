@@ -358,6 +358,11 @@ class HudSpeech{
         this.showSpeechArea(false);
         this.showPortraitLeft(false);
         this.showPortraitRight(false);
+        //create sounds
+        this.sndblip1 = game.sound.add('spblip_1',{volume: 0.15});
+        this.sndblip2 = game.sound.add('spblip_2',{volume: 0.15});
+        this.sndblip3 = game.sound.add('spblip_3',{volume: 0.15});
+        this.sndblip4 = game.sound.add('spblip_4',{volume: 0.15});
 
 
     }
@@ -420,7 +425,10 @@ class HudSpeech{
     addToSpeech(Portait,Text,Duration){
         //Push new String data and durations into speech process.
         let talkTrg = Portait == 'left' ? this.pLeftObj[2] : this.pRightObj[2];
+        talkTrg.spk = 0;
         //console.log("Adding to Speech",Portait,Text,Duration);
+        let txtAr = Text.split(" ");
+        Duration = txtAr.length*200*2;
         this.timeline.add({
             targets: talkTrg,
             spk: 1, // 0 -> 1 (Can be used as a progress percent)
@@ -428,7 +436,7 @@ class HudSpeech{
             onStart: this.blurbStart,
             onStartParams: [this,Portait,Text],
             onUpdate: this.blurbUpdate,
-            onUpdateParams: [this]
+            onUpdateParams: [this,Portait,Text]
 ,           onComplete: this.blurbComplete,
             onCompleteParams: [this,Portait],
         });
@@ -458,9 +466,27 @@ class HudSpeech{
         }else if(p == 'right'){
             hs.showPortraitRight(true);
         }
-        hs.speaktext.setText(text);
+        hs.speaktext.setText("");
+        
     }
-    blurbUpdate(tween,targets,hs){
+    blurbUpdate(tween,targets,hs,p,text){
+        let txtAr = text.split(" ");
+        let cStr = "";
+        let s = targets.spk <= 0.5 ? targets.spk*2 : 1;
+        for(let t =0;t< (txtAr.length * s);t++){
+            cStr+= txtAr[t] + " ";
+        }
+        if(hs.speaktext.text != cStr){
+            hs.speaktext.setText(cStr);
+            let rSnd = hs.sndblip1;
+            if(p == 'left'){
+                rSnd = Phaser.Math.RND.pick([hs.sndblip1,hs.sndblip2]);
+            }else{
+                rSnd = Phaser.Math.RND.pick([hs.sndblip3,hs.sndblip4]);
+            };            
+            rSnd.play();
+        }
+        //console.log(cStr,targets.spk);
         //Allow the speach item to be skipped if a button is pressed.
         if(hs.scene.skipSpeech.isDown && tween.progress < 0.90){
             //console.log("skip attempted");
@@ -471,11 +497,14 @@ class HudSpeech{
         }
     }
     blurbComplete(tween,targets,hs,p){
+        hs.speaktext.setText("");
         if(p == 'left'){
             hs.showPortraitLeft(false);
         }else if(p == 'right'){
             hs.showPortraitRight(false);
         }
+        hs.pLeftObj[2].spk = 0;
+        hs.pRightObj[2].spk = 0;
     }
     showSpeechArea(state){
         this.spAreaObj.forEach(e=>{
