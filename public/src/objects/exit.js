@@ -27,7 +27,8 @@ class Exit extends Phaser.Physics.Matter.Sprite{
         .setStatic(true)
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setIgnoreGravity(true)
-        .setVisible(false);   
+        .setVisible(false)
+        .setDepth(DEPTH_LAYERS.PLAYERS);   
         //Variables
         this.touchedBy = []; // [Solana,Bright] AKA [P1,P2];
         //Collision
@@ -85,6 +86,7 @@ class Exit extends Phaser.Physics.Matter.Sprite{
             yoyo: true,       
             duration: 700  
         });
+        this.exitMarker.setDepth(this.depth+1);
         this.exitMarker.setVisible(false);
     }
     update(time, delta)
@@ -155,8 +157,9 @@ class Exit extends Phaser.Physics.Matter.Sprite{
         if(this.touchedBy[1]){current_exit.bright = this.targetExit;};
 
         if(this.partnerExitName != 'none'){
-            if(this.partnerExit.touchedBy[0]){current_exit.solana = this.targetExit;};
-            if(this.partnerExit.touchedBy[1]){current_exit.bright = this.targetExit;};
+            if(this.partnerExit.touchedBy[0]){current_exit.solana = this.partnerExit.targetExit;};
+            if(this.partnerExit.touchedBy[1]){current_exit.bright = this.partnerExit.targetExit;};
+            
         }
     }
 

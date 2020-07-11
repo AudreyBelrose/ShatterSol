@@ -18,7 +18,7 @@ class Barrier extends Phaser.Physics.Matter.Sprite{
 
         const { Body, Bodies } = Phaser.Physics.Matter.Matter; // Native Matter modules
         const { width: w, height: h } = this.sprite;
-        const mainBody =  Bodies.rectangle(0, 0, w*0.33, h, {chamfer : {radius: 2}});
+        const mainBody =  Bodies.rectangle(0, 0, w, h);
 
         const compoundBody = Body.create({
             parts: [mainBody],
@@ -34,6 +34,7 @@ class Barrier extends Phaser.Physics.Matter.Sprite{
         .setPosition(x, y)
         .setFixedRotation() // Sets inertia to infinity so the player can't rotate
         .setStatic(true)
+        .setDepth(DEPTH_LAYERS.OBJECTS)
         .setIgnoreGravity(true);    
 
         this.debug = scene.add.text(this.x, this.y-16, 'Zone', { fontSize: '10px', fill: '#00FF00' });   
@@ -87,6 +88,7 @@ class Crate extends Phaser.Physics.Matter.Sprite{
         .setExistingBody(compoundBody)
         .setCollisionCategory(CATEGORY.SOLID)
         .setPosition(x, y) 
+        .setDepth(DEPTH_LAYERS.OBJECTS);
 
         this.isGrabbed  = false;
         this.max_speed = 5;
@@ -1160,3 +1162,78 @@ class Chest extends Phaser.Physics.Matter.Sprite{
         }
     }
 };
+//PowerCable
+class PowerCable{
+    constructor(x,y,polyline,scene){
+        this.x = x;
+        this.y = y;
+        this.scene = scene;
+        //Create Cable Graphic
+        this.g_sp1 = scene.add.graphics();
+        this.g_sp1.setPosition(x,y);
+        this.g_sp1.lineStyle(4, 0x000000, 1.0);
+        let polyPath =  new Phaser.Curves.Path();
+        this.polySpline =  new Phaser.Curves.Spline(polyline);
+        polyline.forEach((e,i)=>{
+            if(i==0){
+                polyPath.moveTo(e);
+            }else{
+                polyPath.lineTo(e);
+            };
+        });
+
+
+        //polyPath.draw(g_sp1);
+        this.polySpline.draw(this.g_sp1);
+        this.g_sp1.lineStyle(2, 0x444444, 0.8);
+        this.polySpline.draw(this.g_sp1);
+        this.g_sp1.setDepth(DEPTH_LAYERS.FG);
+        //Particle
+        this.particles = this.scene.add.particles('shapes');
+        this.particles.setDepth(DEPTH_LAYERS.FG);
+        this.emitter = this.particles.createEmitter({
+            active:true,
+            x: this.x,
+            y: this.y,
+            frame: {
+                frames: [
+                    "magic_05"
+                ],
+                cycle: false,
+                quantity: 1
+            },
+            blendMode: Phaser.BlendModes.ADD,
+            scale: 0.25,
+            tint: 0xe2cc66,
+            alpha: {start:1,end:0},
+            lifespan: 250,
+            frequency: -1
+        });
+        this.progress = 0;
+        //Tween Graphics flasher along the spline. Should look cool when line is "active"
+        this.tween = this.scene.tweens.add({
+            targets: this,
+            progress: 1,               
+            ease: 'Linear',       
+            duration: 1000, 
+            repeat: -1,
+            onUpdate: function(tween,targets){                
+                let spVec2 = targets.polySpline.getPoint(targets.progress);
+                targets.emitter.emitParticleAt(spVec2.x+targets.x,spVec2.y+targets.y,1);
+            },
+            onComplete: function(tween, targets){
+               
+            }, 
+            onUpdateParams: [],
+            onCompleteParams: [],
+        });
+    }
+    destroy(){
+        this.g_sp1.destroy();
+        this.emitter.remove();
+        this.particles.destroy();
+        this.tween.remove();
+
+
+    }
+}

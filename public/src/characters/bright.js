@@ -52,7 +52,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.energyChange = 0;
         this.mv_speed = 3;
         this.roll_speed = 0.400;
-        this.jump_speed = 0.016;
+        this.jump_speed = 0.014;
         this.max_speed = {air:10,ground:10};
         this.alive = true;
         this.invuln = false;
@@ -108,6 +108,9 @@ class Bright extends Phaser.Physics.Matter.Sprite{
         this.controller;
         this.ctrlDevice;
         this.ctrlDeviceId = -1;
+
+        //Sounds
+        this.blockSnd = this.scene.sound.add('block1');
 
     }
 
@@ -219,16 +222,19 @@ class Bright extends Phaser.Physics.Matter.Sprite{
                     //     this.beamReady = false;
                     //     soullight.setAimer();
                     //     this.beamAbility.create(soullight.aimer.x,soullight.aimer.y,soullight.aimer.rotation);
-                    // }      
+                    // }    
+
                     //New Beam  
-                    if(control_beam){                
-                        if(Phaser.Math.Distance.Between(this.beamPrevVec2.x,this.beamPrevVec2.y,this.x,this.y) > 2){        
-                            let lb = new Lightblock(this.scene,this.x,this.y);
-                            this.beamPrevVec2.x = this.x;
-                            this.beamPrevVec2.y = this.y;
-                            this.addEnergy(-50);
-                        }
-                    }
+                    // if(control_beam){                
+                    //     if(Phaser.Math.Distance.Between(this.beamPrevVec2.x,this.beamPrevVec2.y,this.x,this.y) > 2){        
+                    //         let lb = new Lightblock(this.scene,this.x,this.y);
+                    //         this.beamPrevVec2.x = this.x;
+                    //         this.beamPrevVec2.y = this.y;
+                            
+                    //         lb.setStatic(true);        
+                    //         this.addEnergy(-50);
+                    //     }
+                    // }
                               
                     if(control_left){
                         this.sprite.setVelocityX(-light_mv_speed);
@@ -634,6 +640,8 @@ class Bright extends Phaser.Physics.Matter.Sprite{
             }, 
             onCompleteParams: [block_effect],
         });
+        this.blockSnd.play();
+        
     }
     receiveHealth(health){
         this.hp+=health;
@@ -644,6 +652,7 @@ class Bright extends Phaser.Physics.Matter.Sprite{
     }
     addEnergy(e){
         this.energyChange+=e;
+        //if(e<0){soullight.alterProtectionRadius(e);}
     }
     resetEnergy(){
         hud.alterEnergyBright(this.energyChange);
